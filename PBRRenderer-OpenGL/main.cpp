@@ -1,5 +1,5 @@
-#define GLEW_STATIC
-#include <GL/glew.h>
+//#define GLEW_STATIC
+#include <glew.h>
 
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -1012,7 +1012,6 @@ int main()
 		glm::mat4 lightSpaceMatrix;
 		GLfloat near_plane = 0.1f, far_plane = 25.0f;
 		lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
-		//lightProjection = glm::perspective(glm::radians(45.0f), (GLfloat)SHADOW_WIDTH / (GLfloat)SHADOW_HEIGHT, near_plane, far_plane);
 		lightView = glm::lookAt(lightDirectionalDirection1 * -3.0f, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
 		lightSpaceMatrix = lightProjection * lightView;
 		//从光源视角渲染场景
@@ -1036,14 +1035,6 @@ int main()
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glViewport(0, 0, WIDTH, HEIGHT);
-
-// 		//阴影贴图DEBUG
-// 		glViewport(0, 0, WIDTH, HEIGHT);
-// 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-// 		debugDepthQuad.useShader();
-// 		glActiveTexture(GL_TEXTURE0);
-// 		glBindTexture(GL_TEXTURE_2D, depthMap);
-// 		RenderQuad();
 
 
 		//------------------------

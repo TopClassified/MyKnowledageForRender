@@ -172,5 +172,6 @@
     <None Include="debug.frag">
       <Filter>资源文件</Filter>
     </None>
+    <None Include="packages.config" />
   </ItemGroup>
 </Project>
