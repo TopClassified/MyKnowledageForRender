@@ -33,7 +33,7 @@
 
 
 GLuint WIDTH = 1980, HEIGHT = 1080;
-GLuint SHADOW_WIDTH = 1024,SHADOW_HEIGHT = 1024;
+GLuint SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
 
 GLuint screenQuadVAO, screenQuadVBO;
 GLuint depthMapFBO, depthMap;
@@ -55,6 +55,7 @@ GLfloat lastX = WIDTH / 2;
 GLfloat lastY = HEIGHT / 2;
 GLfloat deltaTime = 0.0f;
 GLfloat lastFrame = 0.0f;
+GLfloat deltaDepthTime = 0.0f;
 GLfloat deltaGeometryTime = 0.0f;
 GLfloat deltaLightingTime = 0.0f;
 GLfloat deltaSAOTime = 0.0f;
@@ -383,7 +384,7 @@ void imGuiSetup()
 {
 	ImGui_ImplGlfwGL3_NewFrame();
 
-	ImGui::Begin("GLEngine", &guiIsOpen, ImVec2(0, 0), 0.5f, ImGuiWindowFlags_AlwaysUseWindowPadding | ImGuiWindowFlags_NoSavedSettings);
+	ImGui::Begin("PBR", &guiIsOpen, ImVec2(0, 0), 0.5f, ImGuiWindowFlags_AlwaysUseWindowPadding | ImGuiWindowFlags_NoSavedSettings);
 	ImGui::SetWindowSize(ImVec2(350, HEIGHT));
 
 	if (ImGui::CollapsingHeader("Rendering", 0, true, true))
@@ -642,9 +643,10 @@ void imGuiSetup()
 
 	if (ImGui::CollapsingHeader("Profiling", 0, true, true))
 	{
+		ImGui::Text("DepthBuffer Pass : %.4f ms", deltaDepthTime);
 		ImGui::Text("G-Buffer Pass :    %.4f ms", deltaGeometryTime);
 		ImGui::Text("Lighting Pass :    %.4f ms", deltaLightingTime);
-		ImGui::Text("AlchemyAO Pass :         %.4f ms", deltaSAOTime);
+		ImGui::Text("AlchemyAO Pass :   %.4f ms", deltaSAOTime);
 		ImGui::Text("Postprocess Pass : %.4f ms", deltaPostprocessTime);
 		ImGui::Text("Forward Pass :     %.4f ms", deltaForwardTime);
 		ImGui::Text("GUI Pass :         %.4f ms", deltaGUITime);
@@ -676,6 +678,8 @@ void depthBuffer()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
+	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
@@ -970,9 +974,10 @@ int main()
 	//------------------------------
 	// Queries setting for profiling
 	//------------------------------
-	GLuint64 startGeometryTime, startLightingTime, startSAOTime, startPostprocessTime, startForwardTime, startGUITime;
-	GLuint64 stopGeometryTime, stopLightingTime, stopSAOTime, stopPostprocessTime, stopForwardTime, stopGUITime;
+	GLuint64 startDepthTime, startGeometryTime, startLightingTime, startSAOTime, startPostprocessTime, startForwardTime, startGUITime;
+	GLuint64 stopDepthTime, stopGeometryTime, stopLightingTime, stopSAOTime, stopPostprocessTime, stopForwardTime, stopGUITime;
 
+	unsigned int queryIDDepth[2];
 	unsigned int queryIDGeometry[2];
 	unsigned int queryIDLighting[2];
 	unsigned int queryIDSAO[2];
@@ -980,6 +985,7 @@ int main()
 	unsigned int queryIDForward[2];
 	unsigned int queryIDGUI[2];
 
+	glGenQueries(2, queryIDDepth);
 	glGenQueries(2, queryIDGeometry);
 	glGenQueries(2, queryIDLighting);
 	glGenQueries(2, queryIDSAO);
@@ -1008,6 +1014,7 @@ int main()
 		//------------------------
 		// 阴影贴图
 		//------------------------
+		glQueryCounter(queryIDDepth[0], GL_TIMESTAMP);
 		//得到光源视角空间变换矩阵
 		glm::mat4 lightProjection, lightView;
 		glm::mat4 lightSpaceMatrix;
@@ -1036,6 +1043,7 @@ int main()
 
 		glUseProgram(0);
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glQueryCounter(queryIDDepth[1], GL_TIMESTAMP);
 		glViewport(0, 0, WIDTH, HEIGHT);
 
 
@@ -1306,6 +1314,7 @@ int main()
 		//--------------
 		// GPU profiling
 		//--------------
+		GLint stopDepthTimerAvailable = 0;
 		GLint stopGeometryTimerAvailable = 0;
 		GLint stopLightingTimerAvailable = 0;
 		GLint stopSAOTimerAvailable = 0;
@@ -1313,8 +1322,9 @@ int main()
 		GLint stopForwardTimerAvailable = 0;
 		GLint stopGUITimerAvailable = 0;
 
-		while (!stopGeometryTimerAvailable && !stopLightingTimerAvailable && !stopSAOTimerAvailable && !stopPostprocessTimerAvailable && !stopForwardTimerAvailable && !stopGUITimerAvailable)
+		while (!stopGeometryTimerAvailable && !stopLightingTimerAvailable && !stopSAOTimerAvailable && !stopPostprocessTimerAvailable && !stopForwardTimerAvailable && !stopGUITimerAvailable && !stopDepthTimerAvailable)
 		{
+			glGetQueryObjectiv(queryIDDepth[1], GL_QUERY_RESULT_AVAILABLE, &stopDepthTimerAvailable);
 			glGetQueryObjectiv(queryIDGeometry[1], GL_QUERY_RESULT_AVAILABLE, &stopGeometryTimerAvailable);
 			glGetQueryObjectiv(queryIDLighting[1], GL_QUERY_RESULT_AVAILABLE, &stopLightingTimerAvailable);
 			glGetQueryObjectiv(queryIDSAO[1], GL_QUERY_RESULT_AVAILABLE, &stopSAOTimerAvailable);
@@ -1323,6 +1333,8 @@ int main()
 			glGetQueryObjectiv(queryIDGUI[1], GL_QUERY_RESULT_AVAILABLE, &stopGUITimerAvailable);
 		}
 
+		glGetQueryObjectui64v(queryIDDepth[0], GL_QUERY_RESULT, &startDepthTime);
+		glGetQueryObjectui64v(queryIDDepth[1], GL_QUERY_RESULT, &stopDepthTime);
 		glGetQueryObjectui64v(queryIDGeometry[0], GL_QUERY_RESULT, &startGeometryTime);
 		glGetQueryObjectui64v(queryIDGeometry[1], GL_QUERY_RESULT, &stopGeometryTime);
 		glGetQueryObjectui64v(queryIDLighting[0], GL_QUERY_RESULT, &startLightingTime);
@@ -1336,6 +1348,7 @@ int main()
 		glGetQueryObjectui64v(queryIDGUI[0], GL_QUERY_RESULT, &startGUITime);
 		glGetQueryObjectui64v(queryIDGUI[1], GL_QUERY_RESULT, &stopGUITime);
 
+		deltaDepthTime = (stopDepthTime - startDepthTime) / 1000000.0;
 		deltaGeometryTime = (stopGeometryTime - startGeometryTime) / 1000000.0;
 		deltaLightingTime = (stopLightingTime - startLightingTime) / 1000000.0;
 		deltaSAOTime = (stopSAOTime - startSAOTime) / 1000000.0;
