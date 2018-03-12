@@ -166,12 +166,6 @@
     <None Include="shadow_mapping_depth.frag">
       <Filter>资源文件</Filter>
     </None>
-    <None Include="debug.vert">
-      <Filter>资源文件</Filter>
-    </None>
-    <None Include="debug.frag">
-      <Filter>资源文件</Filter>
-    </None>
     <None Include="packages.config" />
   </ItemGroup>
 </Project>

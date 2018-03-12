@@ -150,8 +150,6 @@
     <ClInclude Include="Texture.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="debug.frag" />
-    <None Include="debug.vert" />
     <None Include="packages.config" />
     <None Include="resources\shaders\gBuffer.frag" />
     <None Include="resources\shaders\gBuffer.vert" />

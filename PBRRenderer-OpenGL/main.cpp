@@ -32,10 +32,11 @@
 #include <stb_image.h>
 
 
-GLuint WIDTH = 1980;
-GLuint HEIGHT = 1080;
+GLuint WIDTH = 1980, HEIGHT = 1080;
+GLuint SHADOW_WIDTH = 1024,SHADOW_HEIGHT = 1024;
 
 GLuint screenQuadVAO, screenQuadVBO;
+GLuint depthMapFBO, depthMap;
 GLuint gBuffer, zBuffer, gPosition, gNormal, gAlbedo, gEffects, gworldPos, gworldNormal;
 GLuint saoFBO, saoBlurFBO, saoBuffer, saoBlurBuffer;
 GLuint postprocessFBO, postprocessBuffer;
@@ -99,7 +100,7 @@ glm::vec3 lightDirectionalDirection1 = glm::vec3(-0.2f, -1.0f, -0.3f);
 glm::vec3 lightDirectionalColor1 = glm::vec3(1.0f);
 glm::vec3 modelPosition = glm::vec3(0.0f);
 glm::vec3 modelRotationAxis = glm::vec3(0.0f, 1.0f, 0.0f);
-glm::vec3 modelScale = glm::vec3(0.1f);
+glm::vec3 modelScale = glm::vec3(1.0f);
 
 glm::mat4 projViewModel;
 glm::mat4 prevProjViewModel = projViewModel;
@@ -664,6 +665,24 @@ void imGuiSetup()
 	ImGui::End();
 }
 
+void depthBuffer()
+{
+	//¥¥Ω®‰÷»æ“ı”∞Ã˘Õºµƒ÷°ª∫≥Â
+	glGenFramebuffers(1, &depthMapFBO);
+	glGenTextures(1, &depthMap);
+	glBindTexture(GL_TEXTURE_2D, depthMap);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
 void gBufferSetup()
 {
 	glGenFramebuffers(1, &gBuffer);
@@ -923,6 +942,11 @@ int main()
 	prefilterIBLShader.useShader();
 	glUniform1i(glGetUniformLocation(prefilterIBLShader.Program, "envMap"), 0);
 
+	//----------
+	// depth setup
+	//----------
+	depthBuffer();
+
 	//---------------
 	// G-Buffer setup
 	//---------------
@@ -963,32 +987,7 @@ int main()
 	glGenQueries(2, queryIDForward);
 	glGenQueries(2, queryIDGUI);
 
-	//¥¥Ω®‰÷»æ“ı”∞Ã˘Õºµƒ÷°ª∫≥Â
-	const GLuint SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
-	GLuint depthMapFBO;
-	glGenFramebuffers(1, &depthMapFBO);
-	GLuint depthMap;
-	glGenTextures(1, &depthMap);
-	glBindTexture(GL_TEXTURE_2D, depthMap);
-
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-	GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
-	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
-
-	glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
-	glDrawBuffer(GL_NONE);
-	glReadBuffer(GL_NONE);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-
-	Shader debugDepthQuad;
-	debugDepthQuad.setShader("debug.vert", "debug.frag");
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -1033,8 +1032,9 @@ int main()
 		model = glm::rotate(model, rotationAngle, modelRotationAxis);
 		model = glm::scale(model, modelScale);
 		glUniformMatrix4fv(glGetUniformLocation(depthShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
-		objectModel.Draw();
+		PlaneRender.drawShape();
 
+		glUseProgram(0);
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glViewport(0, 0, WIDTH, HEIGHT);
 
@@ -1046,8 +1046,6 @@ int main()
 		glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-
-		// Model(s) rendering
 		gBufferShader.useShader();
 
 		glUniformMatrix4fv(glGetUniformLocation(gBufferShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
@@ -1076,7 +1074,7 @@ int main()
 		glActiveTexture(GL_TEXTURE4);
 		objectAO.useTexture();
 		glUniform1i(glGetUniformLocation(gBufferShader.Program, "texAO"), 4);
-		objectModel.Draw();
+		PlaneRender.drawShape();
 
 		//ªÊ÷∆µÿ∞Â
 		glActiveTexture(GL_TEXTURE0);
@@ -1101,6 +1099,7 @@ int main()
  		glUniformMatrix4fv(glGetUniformLocation(gBufferShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
  		PlaneRender.drawShape();
 
+		glUseProgram(0);
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glQueryCounter(queryIDGeometry[1], GL_TIMESTAMP);
 
@@ -1148,6 +1147,7 @@ int main()
 			quadRender.drawShape();
 		}
 
+		glUseProgram(0);
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glQueryCounter(queryIDSAO[1], GL_TIMESTAMP);
 
@@ -1226,6 +1226,7 @@ int main()
 
 		quadRender.drawShape();
 
+		glUseProgram(0);
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glQueryCounter(queryIDLighting[1], GL_TIMESTAMP);
 
@@ -1258,6 +1259,7 @@ int main()
 
 		quadRender.drawShape();
 
+		glUseProgram(0);
 		glQueryCounter(queryIDPostprocess[1], GL_TIMESTAMP);
 
 
@@ -1288,6 +1290,8 @@ int main()
 					Light::lightPointList[i].lightMesh.drawShape(simpleShader, view, projection, camera);
 			}
 		}
+
+		glUseProgram(0);
 		glQueryCounter(queryIDForward[1], GL_TIMESTAMP);
 
 
