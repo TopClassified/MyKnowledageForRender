@@ -257,7 +257,7 @@ void cameraMove()
 
 void iblSetup()
 {
-	// Latlong to Cubemap conversion
+	// 将圆柱形HDR贴图转换成立方体贴图
 	glGenFramebuffers(1, &envToCubeFBO);
 	glGenRenderbuffers(1, &envToCubeRBO);
 	glBindFramebuffer(GL_FRAMEBUFFER, envToCubeFBO);
@@ -285,9 +285,10 @@ void iblSetup()
 
 	envMapCube.computeTexMipmap();
 
+	glUseProgram(0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	// Diffuse irradiance capture
+	// 漫反射辐照度捕捉（环境贴图的漫反射部分，使用离散角度的二重积分）
 	glGenFramebuffers(1, &irradianceFBO);
 	glGenRenderbuffers(1, &irradianceRBO);
 	glBindFramebuffer(GL_FRAMEBUFFER, irradianceFBO);
@@ -312,9 +313,10 @@ void iblSetup()
 		envCubeRender.drawShape();
 	}
 
+	glUseProgram(0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	// Prefilter cubemap
+	// 与计算立方体贴图，根据不同的粗糙度生成多种且不同的立方体贴图，用于环境光的镜面反射部分
 	prefilterIBLShader.useShader();
 
 	glUniformMatrix4fv(glGetUniformLocation(prefilterIBLShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(envMapProjection));
@@ -353,9 +355,10 @@ void iblSetup()
 		}
 	}
 
+	glUseProgram(0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	// BRDF LUT
+	// BRDF 查找纹理
 	glGenFramebuffers(1, &brdfLUTFBO);
 	glGenRenderbuffers(1, &brdfLUTRBO);
 	glBindFramebuffer(GL_FRAMEBUFFER, brdfLUTFBO);
@@ -369,6 +372,7 @@ void iblSetup()
 
 	quadRender.drawShape();
 
+	glUseProgram(0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	glViewport(0, 0, WIDTH, HEIGHT);
@@ -665,7 +669,7 @@ void gBufferSetup()
 	glGenFramebuffers(1, &gBuffer);
 	glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
 
-	// Position
+	// 相机空间位置
 	glGenTextures(1, &gPosition);
 	glBindTexture(GL_TEXTURE_2D, gPosition);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, WIDTH, HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
@@ -675,7 +679,7 @@ void gBufferSetup()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gPosition, 0);
 
-	// Albedo + Roughness
+	// 反照率 + 粗糙度
 	glGenTextures(1, &gAlbedo);
 	glBindTexture(GL_TEXTURE_2D, gAlbedo);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, WIDTH, HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
@@ -683,7 +687,7 @@ void gBufferSetup()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gAlbedo, 0);
 
-	// Normals + Metalness
+	// 相机空间位置 + 金属度
 	glGenTextures(1, &gNormal);
 	glBindTexture(GL_TEXTURE_2D, gNormal);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, WIDTH, HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
@@ -691,7 +695,7 @@ void gBufferSetup()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gNormal, 0);
 
-	// Effects (AO + Velocity)
+	// 后期特效（环境光遮蔽 + 速度值（动态模糊））
 	glGenTextures(1, &gEffects);
 	glBindTexture(GL_TEXTURE_2D, gEffects);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, WIDTH, HEIGHT, 0, GL_RGB, GL_FLOAT, NULL);
@@ -699,7 +703,7 @@ void gBufferSetup()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, gEffects, 0);
 
-	//WorldPosition
+	//世界空间位置坐标
 	glGenTextures(1, &gworldPos);
 	glBindTexture(GL_TEXTURE_2D, gworldPos);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, WIDTH, HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
@@ -709,7 +713,7 @@ void gBufferSetup()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT4, GL_TEXTURE_2D, gworldPos, 0);
 
-	//WorldNormal
+	//世界空间法线
 	glGenTextures(1, &gworldNormal);
 	glBindTexture(GL_TEXTURE_2D, gworldNormal);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, WIDTH, HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
@@ -717,11 +721,9 @@ void gBufferSetup()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT5, GL_TEXTURE_2D, gworldNormal, 0);
 
-	// Define the COLOR_ATTACHMENTS for the G-Buffer
 	GLuint attachments[6] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3, GL_COLOR_ATTACHMENT4, GL_COLOR_ATTACHMENT5 };
 	glDrawBuffers(6, attachments);
 
-	// Z-Buffer
 	glGenRenderbuffers(1, &zBuffer);
 	glBindRenderbuffer(GL_RENDERBUFFER, zBuffer);
 	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, WIDTH, HEIGHT);
