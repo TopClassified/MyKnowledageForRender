@@ -385,7 +385,7 @@ void imGuiSetup()
 	ImGui_ImplGlfwGL3_NewFrame();
 
 	ImGui::Begin("PBR", &guiIsOpen, ImVec2(0, 0), 0.5f, ImGuiWindowFlags_AlwaysUseWindowPadding | ImGuiWindowFlags_NoSavedSettings);
-	ImGui::SetWindowSize(ImVec2(350, HEIGHT));
+	ImGui::SetWindowSize(ImVec2(350, 400));
 
 	if (ImGui::CollapsingHeader("Rendering", 0, true, true))
 	{
@@ -883,7 +883,7 @@ int main()
 	objectMetalness.setTexture("resources/textures/pbr/rustediron/rustediron_metalness.png", "ironMetalness", true);
 	objectAO.setTexture("resources/textures/pbr/rustediron/rustediron_ao.png", "ironAO", true);
 
-	envMapHDR.setTextureHDR("resources/textures/hdr/appart.hdr", "appartHDR", true);
+	envMapHDR.setTextureHDR("resources/textures/hdr/canyon.hdr", "canyonHDR", true);
 	envMapCube.setTextureCube(512, GL_RGB, GL_RGB16F, GL_FLOAT, GL_LINEAR_MIPMAP_LINEAR);
 	envMapIrradiance.setTextureCube(32, GL_RGB, GL_RGB16F, GL_FLOAT, GL_LINEAR);
 	envMapPrefilter.setTextureCube(128, GL_RGB, GL_RGB16F, GL_FLOAT, GL_LINEAR_MIPMAP_LINEAR);
