@@ -76,6 +76,8 @@ void main()
 
 	//从环境光吸收贴图中获得值
     gEffects.r = vec3(texture(texAO, TexCoords)).r;
+
+	//计算上一帧与当前帧的像素位移
     gEffects.gb = fragPosA - fragPosB;
 
 	gworldPos = worldPos;

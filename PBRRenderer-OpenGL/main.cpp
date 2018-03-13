@@ -35,8 +35,10 @@
 GLuint WIDTH = 1980, HEIGHT = 1080;
 GLuint SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
 
+glm::mat4 lightSpaceMatrix;
+
 GLuint screenQuadVAO, screenQuadVBO;
-GLuint depthMapFBO, depthMap;
+GLuint frontDepthMapFBO, frontDepthMap, backDepthMapFBO, backDepthMap;
 GLuint gBuffer, zBuffer, gPosition, gNormal, gAlbedo, gEffects, gworldPos, gworldNormal;
 GLuint saoFBO, saoBlurFBO, saoBuffer, saoBlurBuffer;
 GLuint postprocessFBO, postprocessBuffer;
@@ -660,20 +662,42 @@ void imGuiSetup()
 
 void depthBuffer()
 {
+	GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
+
 	//创建渲染阴影贴图的帧缓冲
-	glGenFramebuffers(1, &depthMapFBO);
-	glGenTextures(1, &depthMap);
-	glBindTexture(GL_TEXTURE_2D, depthMap);
+	glGenFramebuffers(1, &frontDepthMapFBO);
+	glGenTextures(1, &frontDepthMap);
+	glBindTexture(GL_TEXTURE_2D, frontDepthMap);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-	GLfloat borderColor[] = { 1.0, 1.0, 1.0, 1.0 };
 	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
 
-	glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, frontDepthMapFBO);
+	glDrawBuffer(GL_NONE);
+	glReadBuffer(GL_NONE);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, frontDepthMap, 0);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+	//创建渲染阴影贴图的帧缓冲
+	glGenFramebuffers(1, &backDepthMapFBO);
+	glGenTextures(1, &backDepthMap);
+	glBindTexture(GL_TEXTURE_2D, backDepthMap);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, backDepthMapFBO);
+	glDrawBuffer(GL_NONE);
+	glReadBuffer(GL_NONE);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, backDepthMap, 0);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
@@ -797,9 +821,284 @@ void postprocessSetup()
 }
 #pragma endregion
 
+#pragma region RenderPass
+
+void RenderDepthMap(bool IsFront,glm::mat4 const &model)
+{
+	glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+	glBindFramebuffer(GL_FRAMEBUFFER, IsFront ? frontDepthMapFBO : backDepthMapFBO);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glEnable(GL_CULL_FACE);
+	glCullFace(IsFront ? GL_BACK : GL_FRONT);
+
+	//得到光源视角空间变换矩阵
+	glm::mat4 lightProjection, lightView;
+	GLfloat near_plane = 0.1f, far_plane = 25.0f;
+	lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
+	lightView = glm::lookAt(lightDirectionalDirection1 * -3.0f, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
+	lightSpaceMatrix = lightProjection * lightView;
+
+	//从光源视角渲染场景
+	depthShader.useShader();
+	glUniformMatrix4fv(glGetUniformLocation(depthShader.Program, "lightSpaceMatrix"), 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
+	glm::mat4 planeModel = glm::mat4();
+	planeModel = glm::translate(planeModel, glm::vec3(0.0f, -50.0f, 0.0f));
+	planeModel = glm::scale(planeModel, glm::vec3(20.0f, 0.2f, 20.0f));
+	glUniformMatrix4fv(glGetUniformLocation(depthShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(planeModel));
+	PlaneRender.drawShape();
+
+	glUniformMatrix4fv(glGetUniformLocation(depthShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
+	PlaneRender.drawShape();
+
+	glUseProgram(0);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glDisable(GL_CULL_FACE);
+	glViewport(0, 0, WIDTH, HEIGHT);
+}
+
+void GBuffer(glm::mat4 const &model, glm::mat4 const &view, glm::mat4 const &projection)
+{
+	glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	gBufferShader.useShader();
+
+	glUniformMatrix4fv(glGetUniformLocation(gBufferShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+	glUniformMatrix4fv(glGetUniformLocation(gBufferShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
+
+	projViewModel = projection * view * model;
+
+	glUniformMatrix4fv(glGetUniformLocation(gBufferShader.Program, "projViewModel"), 1, GL_FALSE, glm::value_ptr(projViewModel));
+	glUniformMatrix4fv(glGetUniformLocation(gBufferShader.Program, "prevProjViewModel"), 1, GL_FALSE, glm::value_ptr(prevProjViewModel));
+	glUniformMatrix4fv(glGetUniformLocation(gBufferShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
+
+	//绘制物体
+	glActiveTexture(GL_TEXTURE0);
+	objectAlbedo.useTexture();
+	glUniform1i(glGetUniformLocation(gBufferShader.Program, "texAlbedo"), 0);
+	glActiveTexture(GL_TEXTURE1);
+	objectNormal.useTexture();
+	glUniform1i(glGetUniformLocation(gBufferShader.Program, "texNormal"), 1);
+	glActiveTexture(GL_TEXTURE2);
+	objectRoughness.useTexture();
+	glUniform1i(glGetUniformLocation(gBufferShader.Program, "texRoughness"), 2);
+	glActiveTexture(GL_TEXTURE3);
+	objectMetalness.useTexture();
+	glUniform1i(glGetUniformLocation(gBufferShader.Program, "texMetalness"), 3);
+	glActiveTexture(GL_TEXTURE4);
+	objectAO.useTexture();
+	glUniform1i(glGetUniformLocation(gBufferShader.Program, "texAO"), 4);
+	PlaneRender.drawShape();
+
+	//绘制地板
+	glActiveTexture(GL_TEXTURE0);
+	floorAlbedo.useTexture();
+	glUniform1i(glGetUniformLocation(gBufferShader.Program, "texAlbedo"), 0);
+	glActiveTexture(GL_TEXTURE1);
+	floorNormal.useTexture();
+	glUniform1i(glGetUniformLocation(gBufferShader.Program, "texNormal"), 1);
+	glActiveTexture(GL_TEXTURE2);
+	floorRoughness.useTexture();
+	glUniform1i(glGetUniformLocation(gBufferShader.Program, "texRoughness"), 2);
+	glActiveTexture(GL_TEXTURE3);
+	floorMetalness.useTexture();
+	glUniform1i(glGetUniformLocation(gBufferShader.Program, "texMetalness"), 3);
+	glActiveTexture(GL_TEXTURE4);
+	floorAO.useTexture();
+	glUniform1i(glGetUniformLocation(gBufferShader.Program, "texAO"), 4);
+	materialF0 = glm::vec3(0.04f);
+	glm::mat4 planeModel = glm::mat4();
+	planeModel = glm::translate(planeModel, glm::vec3(0.0f, -10.0f, 0.0f));
+	planeModel = glm::scale(planeModel, glm::vec3(30.0f, 0.2f, 30.0f));
+	glUniformMatrix4fv(glGetUniformLocation(gBufferShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(planeModel));
+	PlaneRender.drawShape();
+
+	//保存当前帧的MVP矩阵，用于计算像素速度以制作动态模糊效果
+	prevProjViewModel = projViewModel;
+	glUseProgram(0);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void SAO()
+{
+	glBindFramebuffer(GL_FRAMEBUFFER, saoFBO);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	if (saoMode)
+	{
+		saoShader.useShader();
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, gPosition);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, gNormal);
+
+		glUniform1i(glGetUniformLocation(saoShader.Program, "saoSamples"), saoSamples);
+		glUniform1f(glGetUniformLocation(saoShader.Program, "saoRadius"), saoRadius);
+		glUniform1i(glGetUniformLocation(saoShader.Program, "saoTurns"), saoTurns);
+		glUniform1f(glGetUniformLocation(saoShader.Program, "saoBias"), saoBias);
+		glUniform1f(glGetUniformLocation(saoShader.Program, "saoScale"), saoScale);
+		glUniform1f(glGetUniformLocation(saoShader.Program, "saoContrast"), saoContrast);
+		glUniform1i(glGetUniformLocation(saoShader.Program, "viewportWidth"), WIDTH);
+		glUniform1i(glGetUniformLocation(saoShader.Program, "viewportHeight"), HEIGHT);
+
+		quadRender.drawShape();
+
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+		// SAO blur pass
+		glBindFramebuffer(GL_FRAMEBUFFER, saoBlurFBO);
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		saoBlurShader.useShader();
+
+		glUniform1i(glGetUniformLocation(saoBlurShader.Program, "saoBlurSize"), saoBlurSize);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, saoBuffer);
+
+		quadRender.drawShape();
+	}
+
+	glUseProgram(0);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void LightingBRDF(glm::mat4 const &model, glm::mat4 const &view, glm::mat4 const &projection)
+{
+	glBindFramebuffer(GL_FRAMEBUFFER, postprocessFBO);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	lightingBRDFShader.useShader();
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, gPosition);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, gAlbedo);
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, gNormal);
+	glActiveTexture(GL_TEXTURE3);
+	glBindTexture(GL_TEXTURE_2D, gEffects);
+	glActiveTexture(GL_TEXTURE4);
+	glBindTexture(GL_TEXTURE_2D, saoBlurBuffer);
+	glActiveTexture(GL_TEXTURE5);
+	envMapHDR.useTexture();
+	glActiveTexture(GL_TEXTURE6);
+	envMapIrradiance.useTexture();
+	glActiveTexture(GL_TEXTURE7);
+	envMapPrefilter.useTexture();
+	glActiveTexture(GL_TEXTURE8);
+	envMapLUT.useTexture();
+	glActiveTexture(GL_TEXTURE9);
+	glBindTexture(GL_TEXTURE_2D, frontDepthMap);
+	glActiveTexture(GL_TEXTURE10);
+	glBindTexture(GL_TEXTURE_2D, gworldPos);
+	glActiveTexture(GL_TEXTURE11);
+	glBindTexture(GL_TEXTURE_2D, gworldNormal);
+
+	lightPoint1.setLightPosition(lightPointPosition1);
+	lightPoint2.setLightPosition(lightPointPosition2);
+	lightPoint3.setLightPosition(lightPointPosition3);
+	lightPoint1.setLightColor(glm::vec4(lightPointColor1, 1.0f));
+	lightPoint2.setLightColor(glm::vec4(lightPointColor2, 1.0f));
+	lightPoint3.setLightColor(glm::vec4(lightPointColor3, 1.0f));
+	lightPoint1.setLightRadius(lightPointRadius1);
+	lightPoint2.setLightRadius(lightPointRadius2);
+	lightPoint3.setLightRadius(lightPointRadius3);
+
+	for (int i = 0; i < Light::lightPointList.size(); i++)
+	{
+		Light::lightPointList[i].renderToShader(lightingBRDFShader, camera);
+	}
+
+	lightDirectional1.setLightDirection(lightDirectionalDirection1);
+	lightDirectional1.setLightColor(glm::vec4(lightDirectionalColor1, 1.0f));
+
+	for (int i = 0; i < Light::lightDirectionalList.size(); i++)
+	{
+		Light::lightDirectionalList[i].renderToShader(lightingBRDFShader, camera);
+	}
+	//相机矩阵是正交矩阵，获得逆矩阵直接转置即可
+	glUniformMatrix4fv(glGetUniformLocation(lightingBRDFShader.Program, "inverseView"), 1, GL_FALSE, glm::value_ptr(glm::transpose(view)));
+	//求得投影矩阵的逆矩阵
+	glUniformMatrix4fv(glGetUniformLocation(lightingBRDFShader.Program, "inverseProj"), 1, GL_FALSE, glm::value_ptr(glm::inverse(projection)));
+	glUniformMatrix4fv(glGetUniformLocation(lightingBRDFShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
+	glUniformMatrix4fv(glGetUniformLocation(lightingBRDFShader.Program, "lightSpaceMatrix"), 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
+	glUniform3f(glGetUniformLocation(lightingBRDFShader.Program, "materialF0"), materialF0.r, materialF0.g, materialF0.b);
+	glUniform1i(glGetUniformLocation(lightingBRDFShader.Program, "gBufferView"), gBufferView);
+	glUniform1i(glGetUniformLocation(lightingBRDFShader.Program, "pointMode"), pointMode);
+	glUniform1i(glGetUniformLocation(lightingBRDFShader.Program, "directionalMode"), directionalMode);
+	glUniform1i(glGetUniformLocation(lightingBRDFShader.Program, "iblMode"), iblMode);
+	glUniform1i(glGetUniformLocation(lightingBRDFShader.Program, "attenuationMode"), attenuationMode);
+
+	quadRender.drawShape();
+
+	glUseProgram(0);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void PostEffect()
+{
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	firstpassPPShader.useShader();
+	glUniform1i(glGetUniformLocation(firstpassPPShader.Program, "gBufferView"), gBufferView);
+	glUniform2f(glGetUniformLocation(firstpassPPShader.Program, "screenTextureSize"), 1.0f / WIDTH, 1.0f / HEIGHT);
+	glUniform1f(glGetUniformLocation(firstpassPPShader.Program, "cameraAperture"), cameraAperture);
+	glUniform1f(glGetUniformLocation(firstpassPPShader.Program, "cameraShutterSpeed"), cameraShutterSpeed);
+	glUniform1f(glGetUniformLocation(firstpassPPShader.Program, "cameraISO"), cameraISO);
+	glUniform1i(glGetUniformLocation(firstpassPPShader.Program, "saoMode"), saoMode);
+	glUniform1i(glGetUniformLocation(firstpassPPShader.Program, "fxaaMode"), fxaaMode);
+	glUniform1i(glGetUniformLocation(firstpassPPShader.Program, "motionBlurMode"), motionBlurMode);
+	glUniform1f(glGetUniformLocation(firstpassPPShader.Program, "motionBlurScale"), int(ImGui::GetIO().Framerate) / 60.0f);
+	glUniform1i(glGetUniformLocation(firstpassPPShader.Program, "motionBlurMaxSamples"), motionBlurMaxSamples);
+	glUniform1i(glGetUniformLocation(firstpassPPShader.Program, "tonemappingMode"), tonemappingMode);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, postprocessBuffer);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, saoBlurBuffer);
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, gEffects);
+
+	quadRender.drawShape();
+
+	glUseProgram(0);
+}
+
+void ForwardPass(glm::mat4 const &model, glm::mat4 const &view, glm::mat4 const &projection)
+{
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, gBuffer);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+
+	// 将深度信息从Gbuffer中取出并拷贝到默认缓冲当中
+	glBlitFramebuffer(0, 0, WIDTH, HEIGHT, 0, 0, WIDTH, HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	if (pointMode)
+	{
+		simpleShader.useShader();
+		glUniformMatrix4fv(glGetUniformLocation(simpleShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+		glUniformMatrix4fv(glGetUniformLocation(simpleShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
+
+		//将光源用立方体代替
+		for (int i = 0; i < Light::lightPointList.size(); i++)
+		{
+			glUniform4f(glGetUniformLocation(simpleShader.Program, "lightColor"), Light::lightPointList[i].getLightColor().r, Light::lightPointList[i].getLightColor().g, Light::lightPointList[i].getLightColor().b, Light::lightPointList[i].getLightColor().a);
+
+			if (Light::lightPointList[i].isMesh())
+			{
+				Light::lightPointList[i].lightMesh.drawShape(simpleShader, view, projection, camera);
+			}
+		}
+	}
+
+	glUseProgram(0);
+}
+#pragma endregion
+
 int main()
 {
-	//初始化GLFW以及运行窗口
+#pragma region Init
 	glfwInit();
 
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -887,16 +1186,15 @@ int main()
 	floorMetalness.setTexture("resources/textures/pbr/woodfloor/woodfloor_metalness.png", "woodfloorMetalness", true);
 	floorAO.setTexture("resources/textures/pbr/woodfloor/woodfloor_ao.png", "woodfloorAO", true);
 
-
 	//载入模型
 	objectModel.loadModel("resources/models/shaderball/shaderball.obj");
 
-
-	//创建基础模型
 	//立方体贴图
 	envCubeRender.setShape("cube", glm::vec3(0.0f));
+
 	//帧缓冲贴图
 	quadRender.setShape("quad", glm::vec3(0.0f));
+
 	//地板
 	PlaneRender.setShape("cube", glm::vec3(0.0f));
 
@@ -940,34 +1238,17 @@ int main()
 	prefilterIBLShader.useShader();
 	glUniform1i(glGetUniformLocation(prefilterIBLShader.Program, "envMap"), 0);
 
-	//----------
-	// depth setup
-	//----------
 	depthBuffer();
 
-	//---------------
-	// G-Buffer setup
-	//---------------
 	gBufferSetup();
 
-	//------------
-	// SAO setup
-	//------------
 	saoSetup();
 
-	//---------------------
-	// Postprocessing setup
-	//---------------------
 	postprocessSetup();
 
-	//----------
-	// IBL setup
-	//----------
 	iblSetup();
 
-	//------------------------------
 	// Queries setting for profiling
-	//------------------------------
 	GLuint64 startDepthTime, startGeometryTime, startLightingTime, startSAOTime, startPostprocessTime, startForwardTime, startGUITime;
 	GLuint64 stopDepthTime, stopGeometryTime, stopLightingTime, stopSAOTime, stopPostprocessTime, stopForwardTime, stopGUITime;
 
@@ -988,6 +1269,7 @@ int main()
 	glGenQueries(2, queryIDGUI);
 
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+#pragma endregion
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -1004,306 +1286,49 @@ int main()
 		glm::mat4 projection = glm::perspective(camera.cameraFOV, (float)WIDTH / (float)HEIGHT, 0.1f, 1000.0f);
 		glm::mat4 view = camera.GetViewMatrix();
 		glm::mat4 model;
-
-		//------------------------
-		// 阴影贴图
-		//------------------------
-		glQueryCounter(queryIDDepth[0], GL_TIMESTAMP);
-		//得到光源视角空间变换矩阵
-		glm::mat4 lightProjection, lightView;
-		glm::mat4 lightSpaceMatrix;
-		GLfloat near_plane = 0.1f, far_plane = 25.0f;
-		lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
-		lightView = glm::lookAt(lightDirectionalDirection1 * -3.0f, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
-		lightSpaceMatrix = lightProjection * lightView;
-		//从光源视角渲染场景
-		depthShader.useShader();
-		glUniformMatrix4fv(glGetUniformLocation(depthShader.Program, "lightSpaceMatrix"), 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
-		glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
-		glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		model = glm::mat4();
-		model = glm::translate(model, glm::vec3(0.0f, -5.0f, 0.0f));
-		model = glm::scale(model, glm::vec3(50.0f, 0.5f, 50.0f));
-		glUniformMatrix4fv(glGetUniformLocation(depthShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
-		PlaneRender.drawShape();
 		GLfloat rotationAngle = glfwGetTime() / 5.0f * modelRotationSpeed;
 		model = glm::mat4();
 		model = glm::translate(model, modelPosition);
 		model = glm::rotate(model, rotationAngle, modelRotationAxis);
 		model = glm::scale(model, modelScale);
-		glUniformMatrix4fv(glGetUniformLocation(depthShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
-		PlaneRender.drawShape();
 
-		glUseProgram(0);
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		// 阴影贴图
+		glQueryCounter(queryIDDepth[0], GL_TIMESTAMP);
+		RenderDepthMap(true, model);
+		RenderDepthMap(false, model);
 		glQueryCounter(queryIDDepth[1], GL_TIMESTAMP);
-		glViewport(0, 0, WIDTH, HEIGHT);
 
-
-		//------------------------
-		// 渲染基础模型
-		//------------------------
+		// GBuffer
 		glQueryCounter(queryIDGeometry[0], GL_TIMESTAMP);
-		glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-		gBufferShader.useShader();
-
-		glUniformMatrix4fv(glGetUniformLocation(gBufferShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
-		glUniformMatrix4fv(glGetUniformLocation(gBufferShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
-
-		projViewModel = projection * view * model;
-
-		glUniformMatrix4fv(glGetUniformLocation(gBufferShader.Program, "projViewModel"), 1, GL_FALSE, glm::value_ptr(projViewModel));
-		glUniformMatrix4fv(glGetUniformLocation(gBufferShader.Program, "prevProjViewModel"), 1, GL_FALSE, glm::value_ptr(prevProjViewModel));
-		glUniformMatrix4fv(glGetUniformLocation(gBufferShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
-
-		//绘制物体
-		glActiveTexture(GL_TEXTURE0);
-		objectAlbedo.useTexture();
-		glUniform1i(glGetUniformLocation(gBufferShader.Program, "texAlbedo"), 0);
-		glActiveTexture(GL_TEXTURE1);
-		objectNormal.useTexture();
-		glUniform1i(glGetUniformLocation(gBufferShader.Program, "texNormal"), 1);
-		glActiveTexture(GL_TEXTURE2);
-		objectRoughness.useTexture();
-		glUniform1i(glGetUniformLocation(gBufferShader.Program, "texRoughness"), 2);
-		glActiveTexture(GL_TEXTURE3);
-		objectMetalness.useTexture();
-		glUniform1i(glGetUniformLocation(gBufferShader.Program, "texMetalness"), 3);
-		glActiveTexture(GL_TEXTURE4);
-		objectAO.useTexture();
-		glUniform1i(glGetUniformLocation(gBufferShader.Program, "texAO"), 4);
-		PlaneRender.drawShape();
-
-		//绘制地板
-		glActiveTexture(GL_TEXTURE0);
-		floorAlbedo.useTexture();
-		glUniform1i(glGetUniformLocation(gBufferShader.Program, "texAlbedo"), 0);
-		glActiveTexture(GL_TEXTURE1);
-		floorNormal.useTexture();
-		glUniform1i(glGetUniformLocation(gBufferShader.Program, "texNormal"), 1);
-		glActiveTexture(GL_TEXTURE2);
-		floorRoughness.useTexture();
-		glUniform1i(glGetUniformLocation(gBufferShader.Program, "texRoughness"), 2);
-		glActiveTexture(GL_TEXTURE3);
-		floorMetalness.useTexture();
-		glUniform1i(glGetUniformLocation(gBufferShader.Program, "texMetalness"), 3);
-		glActiveTexture(GL_TEXTURE4);
-		floorAO.useTexture();
-		glUniform1i(glGetUniformLocation(gBufferShader.Program, "texAO"), 4);
-		materialF0 = glm::vec3(0.04f);
- 		model = glm::mat4();
-		model = glm::translate(model, glm::vec3(0.0f, -5.0f, 0.0f));
-		model = glm::scale(model, glm::vec3(50.0f, 0.5f, 50.0f));
- 		glUniformMatrix4fv(glGetUniformLocation(gBufferShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
- 		PlaneRender.drawShape();
-
-		glUseProgram(0);
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		GBuffer(model, view, projection);
 		glQueryCounter(queryIDGeometry[1], GL_TIMESTAMP);
 
-		prevProjViewModel = projViewModel;
-
-		//---------------
-		// 环境光遮蔽
-		//---------------
+		// 环境光遮蔽贴图
 		glQueryCounter(queryIDSAO[0], GL_TIMESTAMP);
-		glBindFramebuffer(GL_FRAMEBUFFER, saoFBO);
-		glClear(GL_COLOR_BUFFER_BIT);
-
-		if (saoMode)
-		{
-			saoShader.useShader();
-
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, gPosition);
-			glActiveTexture(GL_TEXTURE1);
-			glBindTexture(GL_TEXTURE_2D, gNormal);
-
-			glUniform1i(glGetUniformLocation(saoShader.Program, "saoSamples"), saoSamples);
-			glUniform1f(glGetUniformLocation(saoShader.Program, "saoRadius"), saoRadius);
-			glUniform1i(glGetUniformLocation(saoShader.Program, "saoTurns"), saoTurns);
-			glUniform1f(glGetUniformLocation(saoShader.Program, "saoBias"), saoBias);
-			glUniform1f(glGetUniformLocation(saoShader.Program, "saoScale"), saoScale);
-			glUniform1f(glGetUniformLocation(saoShader.Program, "saoContrast"), saoContrast);
-			glUniform1i(glGetUniformLocation(saoShader.Program, "viewportWidth"), WIDTH);
-			glUniform1i(glGetUniformLocation(saoShader.Program, "viewportHeight"), HEIGHT);
-
-			quadRender.drawShape();
-
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-			// SAO blur pass
-			glBindFramebuffer(GL_FRAMEBUFFER, saoBlurFBO);
-			glClear(GL_COLOR_BUFFER_BIT);
-
-			saoBlurShader.useShader();
-
-			glUniform1i(glGetUniformLocation(saoBlurShader.Program, "saoBlurSize"), saoBlurSize);
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, saoBuffer);
-
-			quadRender.drawShape();
-		}
-
-		glUseProgram(0);
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		SAO();
 		glQueryCounter(queryIDSAO[1], GL_TIMESTAMP);
 
-
-		//------------------------
 		// 光照渲染
-		//------------------------
 		glQueryCounter(queryIDLighting[0], GL_TIMESTAMP);
-		glBindFramebuffer(GL_FRAMEBUFFER, postprocessFBO);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-		lightingBRDFShader.useShader();
-
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, gPosition);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, gAlbedo);
-		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_2D, gNormal);
-		glActiveTexture(GL_TEXTURE3);
-		glBindTexture(GL_TEXTURE_2D, gEffects);
-		glActiveTexture(GL_TEXTURE4);
-		glBindTexture(GL_TEXTURE_2D, saoBlurBuffer);
-		glActiveTexture(GL_TEXTURE5);
-		envMapHDR.useTexture();
-		glActiveTexture(GL_TEXTURE6);
-		envMapIrradiance.useTexture();
-		glActiveTexture(GL_TEXTURE7);
-		envMapPrefilter.useTexture();
-		glActiveTexture(GL_TEXTURE8);
-		envMapLUT.useTexture();
-		glActiveTexture(GL_TEXTURE9);
-		glBindTexture(GL_TEXTURE_2D, depthMap);
-		glActiveTexture(GL_TEXTURE10);
-		glBindTexture(GL_TEXTURE_2D, gworldPos);
-		glActiveTexture(GL_TEXTURE11);
-		glBindTexture(GL_TEXTURE_2D, gworldNormal);
-
-		lightPoint1.setLightPosition(lightPointPosition1);
-		lightPoint2.setLightPosition(lightPointPosition2);
-		lightPoint3.setLightPosition(lightPointPosition3);
-		lightPoint1.setLightColor(glm::vec4(lightPointColor1, 1.0f));
-		lightPoint2.setLightColor(glm::vec4(lightPointColor2, 1.0f));
-		lightPoint3.setLightColor(glm::vec4(lightPointColor3, 1.0f));
-		lightPoint1.setLightRadius(lightPointRadius1);
-		lightPoint2.setLightRadius(lightPointRadius2);
-		lightPoint3.setLightRadius(lightPointRadius3);
-
-		for (int i = 0; i < Light::lightPointList.size(); i++)
-		{
-			Light::lightPointList[i].renderToShader(lightingBRDFShader, camera);
-		}
-
-		lightDirectional1.setLightDirection(lightDirectionalDirection1);
-		lightDirectional1.setLightColor(glm::vec4(lightDirectionalColor1, 1.0f));
-
-		for (int i = 0; i < Light::lightDirectionalList.size(); i++)
-		{
-			Light::lightDirectionalList[i].renderToShader(lightingBRDFShader, camera);
-		}
-		//相机矩阵是正交矩阵，获得逆矩阵直接转置即可
-		glUniformMatrix4fv(glGetUniformLocation(lightingBRDFShader.Program, "inverseView"), 1, GL_FALSE, glm::value_ptr(glm::transpose(view)));
-		//求得投影矩阵的逆矩阵
-		glUniformMatrix4fv(glGetUniformLocation(lightingBRDFShader.Program, "inverseProj"), 1, GL_FALSE, glm::value_ptr(glm::inverse(projection)));
-		glUniformMatrix4fv(glGetUniformLocation(lightingBRDFShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
-		glUniformMatrix4fv(glGetUniformLocation(lightingBRDFShader.Program, "lightSpaceMatrix"), 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
-		glUniform3f(glGetUniformLocation(lightingBRDFShader.Program, "materialF0"), materialF0.r, materialF0.g, materialF0.b);
-		glUniform1i(glGetUniformLocation(lightingBRDFShader.Program, "gBufferView"), gBufferView);
-		glUniform1i(glGetUniformLocation(lightingBRDFShader.Program, "pointMode"), pointMode);
-		glUniform1i(glGetUniformLocation(lightingBRDFShader.Program, "directionalMode"), directionalMode);
-		glUniform1i(glGetUniformLocation(lightingBRDFShader.Program, "iblMode"), iblMode);
-		glUniform1i(glGetUniformLocation(lightingBRDFShader.Program, "attenuationMode"), attenuationMode);
-
-		quadRender.drawShape();
-
-		glUseProgram(0);
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		LightingBRDF(model, view, projection);
 		glQueryCounter(queryIDLighting[1], GL_TIMESTAMP);
 
-
-		//-------------------------------
 		// 后期渲染
-		//-------------------------------
 		glQueryCounter(queryIDPostprocess[0], GL_TIMESTAMP);
-		glClear(GL_COLOR_BUFFER_BIT);
-
-		firstpassPPShader.useShader();
-		glUniform1i(glGetUniformLocation(firstpassPPShader.Program, "gBufferView"), gBufferView);
-		glUniform2f(glGetUniformLocation(firstpassPPShader.Program, "screenTextureSize"), 1.0f / WIDTH, 1.0f / HEIGHT);
-		glUniform1f(glGetUniformLocation(firstpassPPShader.Program, "cameraAperture"), cameraAperture);
-		glUniform1f(glGetUniformLocation(firstpassPPShader.Program, "cameraShutterSpeed"), cameraShutterSpeed);
-		glUniform1f(glGetUniformLocation(firstpassPPShader.Program, "cameraISO"), cameraISO);
-		glUniform1i(glGetUniformLocation(firstpassPPShader.Program, "saoMode"), saoMode);
-		glUniform1i(glGetUniformLocation(firstpassPPShader.Program, "fxaaMode"), fxaaMode);
-		glUniform1i(glGetUniformLocation(firstpassPPShader.Program, "motionBlurMode"), motionBlurMode);
-		glUniform1f(glGetUniformLocation(firstpassPPShader.Program, "motionBlurScale"), int(ImGui::GetIO().Framerate) / 60.0f);
-		glUniform1i(glGetUniformLocation(firstpassPPShader.Program, "motionBlurMaxSamples"), motionBlurMaxSamples);
-		glUniform1i(glGetUniformLocation(firstpassPPShader.Program, "tonemappingMode"), tonemappingMode);
-
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, postprocessBuffer);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, saoBlurBuffer);
-		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_2D, gEffects);
-
-		quadRender.drawShape();
-
-		glUseProgram(0);
+		PostEffect();
 		glQueryCounter(queryIDPostprocess[1], GL_TIMESTAMP);
 
-
-		//-----------------------
 		// 正向渲染部分
-		//-----------------------
 		glQueryCounter(queryIDForward[0], GL_TIMESTAMP);
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, gBuffer);
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-
-		// 将深度信息从Gbuffer中取出并拷贝到默认缓冲当中
-		glBlitFramebuffer(0, 0, WIDTH, HEIGHT, 0, 0, WIDTH, HEIGHT, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-		// Shape(s) rendering
-		if (pointMode)
-		{
-			simpleShader.useShader();
-			glUniformMatrix4fv(glGetUniformLocation(simpleShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
-			glUniformMatrix4fv(glGetUniformLocation(simpleShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
-
-			//将光源用立方体代替
-			for (int i = 0; i < Light::lightPointList.size(); i++)
-			{
-				glUniform4f(glGetUniformLocation(simpleShader.Program, "lightColor"), Light::lightPointList[i].getLightColor().r, Light::lightPointList[i].getLightColor().g, Light::lightPointList[i].getLightColor().b, Light::lightPointList[i].getLightColor().a);
-
-				if (Light::lightPointList[i].isMesh())
-					Light::lightPointList[i].lightMesh.drawShape(simpleShader, view, projection, camera);
-			}
-		}
-
-		glUseProgram(0);
+		ForwardPass(model, view, projection);
 		glQueryCounter(queryIDForward[1], GL_TIMESTAMP);
 
-
-		//----------------
-		// ImGui rendering
-		//----------------
+		// ImGui
 		glQueryCounter(queryIDGUI[0], GL_TIMESTAMP);
 		ImGui::Render();
 		glQueryCounter(queryIDGUI[1], GL_TIMESTAMP);
 
-
-		//--------------
-		// GPU profiling
-		//--------------
+		//计算GPU消耗
 		GLint stopDepthTimerAvailable = 0;
 		GLint stopGeometryTimerAvailable = 0;
 		GLint stopLightingTimerAvailable = 0;

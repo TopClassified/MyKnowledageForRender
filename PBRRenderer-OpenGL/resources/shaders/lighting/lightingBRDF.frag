@@ -320,7 +320,7 @@ void main()
 
             vec3 ambientIBL = (diffuseIrradiance * kD) + specularRadiance;
 
-            color += ambientIBL;
+            color += ambientIBL * 0.7;
         }
 		//不要忘记乘上光遮蔽贴图
         color *= ao;
