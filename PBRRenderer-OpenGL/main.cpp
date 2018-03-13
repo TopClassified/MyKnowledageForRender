@@ -62,9 +62,6 @@ GLfloat deltaSAOTime = 0.0f;
 GLfloat deltaPostprocessTime = 0.0f;
 GLfloat deltaForwardTime = 0.0f;
 GLfloat deltaGUITime = 0.0f;
-GLfloat materialRoughness = 0.01f;
-GLfloat materialMetallicity = 0.02f;
-GLfloat ambientIntensity = 0.005f;
 GLfloat saoRadius = 0.3f;
 GLfloat saoBias = 0.001f;
 GLfloat saoScale = 0.7f;
@@ -89,7 +86,6 @@ bool firstMouse = true;
 bool guiIsOpen = true;
 bool keys[1024];
 
-glm::vec3 albedoColor = glm::vec3(1.0f);
 glm::vec3 materialF0 = glm::vec3(0.04f);  // UE4 dielectric
 glm::vec3 lightPointPosition1 = glm::vec3(1.5f, 0.75f, 1.0f);
 glm::vec3 lightPointPosition2 = glm::vec3(-1.5f, 1.0f, 1.0f);
@@ -385,18 +381,36 @@ void imGuiSetup()
 	ImGui_ImplGlfwGL3_NewFrame();
 
 	ImGui::Begin("PBR", &guiIsOpen, ImVec2(0, 0), 0.5f, ImGuiWindowFlags_AlwaysUseWindowPadding | ImGuiWindowFlags_NoSavedSettings);
-	ImGui::SetWindowSize(ImVec2(350, 400));
+	ImGui::SetWindowSize(ImVec2(350, HEIGHT));
+
+	if (ImGui::CollapsingHeader("Application Info", 0, true, true))
+	{
+		char* glInfos = (char*)glGetString(GL_VERSION);
+		char* hardwareInfos = (char*)glGetString(GL_RENDERER);
+
+		ImGui::Text("OpenGL Version :");
+		ImGui::Text(glInfos);
+		ImGui::Text("Hardware Informations :");
+		ImGui::Text(hardwareInfos);
+		ImGui::Text("\nFramerate %.2f FPS / Frametime %.4f ms", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate);
+	}
+
+	if (ImGui::CollapsingHeader("Profiling", 0, true, true))
+	{
+		ImGui::Text("DepthBuffer Pass : %.4f ms", deltaDepthTime);
+		ImGui::Text("G-Buffer Pass :    %.4f ms", deltaGeometryTime);
+		ImGui::Text("Lighting Pass :    %.4f ms", deltaLightingTime);
+		ImGui::Text("AlchemyAO Pass :   %.4f ms", deltaSAOTime);
+		ImGui::Text("Postprocess Pass : %.4f ms", deltaPostprocessTime);
+		ImGui::Text("Forward Pass :     %.4f ms", deltaForwardTime);
+		ImGui::Text("GUI Pass :         %.4f ms", deltaGUITime);
+	}
 
 	if (ImGui::CollapsingHeader("Rendering", 0, true, true))
 	{
 		if (ImGui::TreeNode("Material"))
 		{
-			ImGui::ColorEdit3("Albedo", (float*)&albedoColor);
-			ImGui::SliderFloat("Roughness", &materialRoughness, 0.0f, 1.0f);
-			ImGui::SliderFloat("Metalness", &materialMetallicity, 0.0f, 1.0f);
 			ImGui::SliderFloat3("F0", (float*)&materialF0, 0.0f, 1.0f);
-			ImGui::SliderFloat("Ambient Intensity", &ambientIntensity, 0.0f, 1.0f);
-
 			ImGui::TreePop();
 		}
 
@@ -639,29 +653,6 @@ void imGuiSetup()
 
 			ImGui::TreePop();
 		}
-	}
-
-	if (ImGui::CollapsingHeader("Profiling", 0, true, true))
-	{
-		ImGui::Text("DepthBuffer Pass : %.4f ms", deltaDepthTime);
-		ImGui::Text("G-Buffer Pass :    %.4f ms", deltaGeometryTime);
-		ImGui::Text("Lighting Pass :    %.4f ms", deltaLightingTime);
-		ImGui::Text("AlchemyAO Pass :   %.4f ms", deltaSAOTime);
-		ImGui::Text("Postprocess Pass : %.4f ms", deltaPostprocessTime);
-		ImGui::Text("Forward Pass :     %.4f ms", deltaForwardTime);
-		ImGui::Text("GUI Pass :         %.4f ms", deltaGUITime);
-	}
-
-	if (ImGui::CollapsingHeader("Application Info", 0, true, true))
-	{
-		char* glInfos = (char*)glGetString(GL_VERSION);
-		char* hardwareInfos = (char*)glGetString(GL_RENDERER);
-
-		ImGui::Text("OpenGL Version :");
-		ImGui::Text(glInfos);
-		ImGui::Text("Hardware Informations :");
-		ImGui::Text(hardwareInfos);
-		ImGui::Text("\nFramerate %.2f FPS / Frametime %.4f ms", ImGui::GetIO().Framerate, 1000.0f / ImGui::GetIO().Framerate);
 	}
 
 	ImGui::End();
@@ -1064,7 +1055,6 @@ int main()
 		glUniformMatrix4fv(glGetUniformLocation(gBufferShader.Program, "projViewModel"), 1, GL_FALSE, glm::value_ptr(projViewModel));
 		glUniformMatrix4fv(glGetUniformLocation(gBufferShader.Program, "prevProjViewModel"), 1, GL_FALSE, glm::value_ptr(prevProjViewModel));
 		glUniformMatrix4fv(glGetUniformLocation(gBufferShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
-		glUniform3f(glGetUniformLocation(gBufferShader.Program, "albedoColor"), albedoColor.r, albedoColor.g, albedoColor.b);
 
 		//ªÊ÷∆ŒÔÃÂ
 		glActiveTexture(GL_TEXTURE0);
@@ -1222,10 +1212,7 @@ int main()
 		glUniformMatrix4fv(glGetUniformLocation(lightingBRDFShader.Program, "inverseProj"), 1, GL_FALSE, glm::value_ptr(glm::inverse(projection)));
 		glUniformMatrix4fv(glGetUniformLocation(lightingBRDFShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
 		glUniformMatrix4fv(glGetUniformLocation(lightingBRDFShader.Program, "lightSpaceMatrix"), 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
-		glUniform1f(glGetUniformLocation(lightingBRDFShader.Program, "materialRoughness"), materialRoughness);
-		glUniform1f(glGetUniformLocation(lightingBRDFShader.Program, "materialMetallicity"), materialMetallicity);
 		glUniform3f(glGetUniformLocation(lightingBRDFShader.Program, "materialF0"), materialF0.r, materialF0.g, materialF0.b);
-		glUniform1f(glGetUniformLocation(lightingBRDFShader.Program, "ambientIntensity"), ambientIntensity);
 		glUniform1i(glGetUniformLocation(lightingBRDFShader.Program, "gBufferView"), gBufferView);
 		glUniform1i(glGetUniformLocation(lightingBRDFShader.Program, "pointMode"), pointMode);
 		glUniform1i(glGetUniformLocation(lightingBRDFShader.Program, "directionalMode"), directionalMode);

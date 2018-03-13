@@ -19,7 +19,6 @@ in vec3 worldNormal;
 const float nearPlane = 1.0f;
 const float farPlane = 1000.0f;
 
-uniform vec3 albedoColor;
 uniform sampler2D texAlbedo;
 uniform sampler2D texNormal;
 uniform sampler2D texRoughness;
@@ -65,7 +64,6 @@ void main()
 
 	//输出从反照率贴图当中采样到的反照率
     gAlbedo.rgb = vec3(texture(texAlbedo, TexCoords));
-    //gAlbedo.rgb = vec3(albedoColor);
 
 	//将gAlbedo的a分量赋值为粗糙度来节省贴图数量
     gAlbedo.a = vec3(texture(texRoughness, TexCoords)).r;

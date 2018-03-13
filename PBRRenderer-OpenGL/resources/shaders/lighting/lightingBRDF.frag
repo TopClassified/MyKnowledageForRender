@@ -45,9 +45,6 @@ uniform bool pointMode;
 uniform bool directionalMode;
 uniform bool iblMode;
 uniform int attenuationMode;
-uniform float materialRoughness;
-uniform float materialMetallicity;
-uniform float ambientIntensity;
 uniform vec3 materialF0;
 
 uniform mat4 view;
