@@ -849,7 +849,7 @@ int main()
 	gBufferShader.setShader("resources/shaders/gBuffer.vert", "resources/shaders/gBuffer.frag");
 	//将圆柱体的HDR贴图变换到立方体的skybox的着色器
 	latlongToCubeShader.setShader("resources/shaders/latlongToCube.vert", "resources/shaders/latlongToCube.frag");
-	//一个简单的光照着色器
+	//一个简单的着色器用于渲染点光源
 	simpleShader.setShader("resources/shaders/lighting/simple.vert", "resources/shaders/lighting/simple.frag");
 	//光照BRDF着色器
 	lightingBRDFShader.setShader("resources/shaders/lighting/lightingBRDF.vert", "resources/shaders/lighting/lightingBRDF.frag");
@@ -893,8 +893,11 @@ int main()
 
 
 	//创建基础模型
+	//立方体贴图
 	envCubeRender.setShape("cube", glm::vec3(0.0f));
+	//帧缓冲贴图
 	quadRender.setShape("quad", glm::vec3(0.0f));
+	//地板
 	PlaneRender.setShape("cube", glm::vec3(0.0f));
 
 	//设置灯光
