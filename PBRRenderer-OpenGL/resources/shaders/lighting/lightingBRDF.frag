@@ -165,6 +165,22 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 Normal, vec3 lightPos, vec3
     return shadow;
 }
 
+float gaussianBlurVertical(vec2 projCoord)
+{
+	float weightH[5] = {0.0545, 0.2442, 0.4026, 0.2442, 0.0545};
+	float weightV[5] = {0.0545, 0.2442, 0.4026, 0.2442, 0.0545};
+	float result = 0.0f;
+	vec2 texelSize = 1.0 / textureSize(ShadowMap, 0);
+	for (int i = -2; i <= 2; ++i)
+	{
+		for (int j = -2; j <= 2; ++j)
+		{
+			result += texture(ShadowMap, projCoord.xy + vec2(j, i) * texelSize * 0.1).r * weightH[i + 2] * weightV[j + 2];
+		}
+	}
+	return result;
+}
+
 vec3 transmittance(float translucency, float width, vec3 worldPosition, vec3 worldNormal) 
 {
 	float scale = 8.25 * (1.0 - translucency) / width;
@@ -176,7 +192,7 @@ vec3 transmittance(float translucency, float width, vec3 worldPosition, vec3 wor
 	vec3 projCoord = shadowPosition.xyz / shadowPosition.w;
 	projCoord = projCoord * 0.5 + 0.5;
 
-	float d1 = texture(ShadowMap, projCoord.xy).r;	
+	float d1 = gaussianBlurVertical(projCoord.xy);	
 	float d2 = projCoord.z;		
 	
 	float d = scale * abs(d1 - d2);
