@@ -4,8 +4,6 @@ in vec2 TexCoords;
 in vec3 envMapCoords;
 out vec4 colorOutput;
 
-in mat4 LightSpaceMatrix;
-
 const float PI = 3.14159265359f;
 const float prefilterLODLevel = 4.0f;
 
@@ -36,9 +34,12 @@ uniform samplerCube envMapPrefilter;
 uniform sampler2D envMapLUT;
 
 //阴影贴图
+uniform float LightSpaceNear;
+uniform float LightSpaceFar;
 uniform sampler2D ShadowMap;
 uniform sampler2D worldPos;
 uniform sampler2D worldNormal;
+uniform mat4 LightSpaceMatrix;
 
 uniform int gBufferView;
 uniform bool pointMode;
@@ -49,6 +50,11 @@ uniform vec3 materialF0;
 
 uniform mat4 view;
 
+float depthLinear(float depth)
+{
+	float z = depth * 2.0f - 1.0f;
+	return (2.0f * LightSpaceNear * LightSpaceFar) / (LightSpaceFar + LightSpaceNear - z * (LightSpaceFar - LightSpaceNear));
+}
 
 vec3 colorLinear(vec3 colorVector)
 {
@@ -57,12 +63,10 @@ vec3 colorLinear(vec3 colorVector)
     return linearColor;
 }
 
-
 float saturate(float f)
 {
     return clamp(f, 0.0f, 1.0f);
 }
-
 
 vec2 getSphericalCoord(vec3 normalCoord)
 {
@@ -72,12 +76,10 @@ vec2 getSphericalCoord(vec3 normalCoord)
     return vec2(theta / (2.0f * PI), phi / PI);
 }
 
-
 float Fd90(float NoL, float roughness)
 {
     return (2.0f * NoL * roughness) + 0.4f;
 }
-
 
 float KDisneyTerm(float NoL, float NoV, float roughness)
 {
@@ -163,6 +165,48 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 Normal, vec3 lightPos, vec3
     return shadow;
 }
 
+vec3 transmittance(	float translucency,			// control the transmittance effect. Range: [0..1]
+					float width,				// Width of the filter
+					vec3 worldPosition,			// Position in world space
+					vec3 worldNormal,			// Normal in world space
+					vec3 light,					// Light vector: lightWorldPosition - worldPosition
+					sampler2D shadowMapTex,		// Linear 0..1 shadow map
+					mat4 lightViewProjection,	// Regular world to light space matrix
+					float lightFarPlane			// Far plane distance used in the light projection matrix
+					) 
+{
+	// Calculate the scale of the effect:
+	float scale = 8.25 * (1.0 - translucency) / width;
+
+	// Shrink the position inwards the surface to avoid artifacts:
+	vec4 shrinkedPos = vec4(worldPosition - 0.005 * worldNormal, 1.0);
+
+	// Calculate the thickness from the light point of view:
+	vec4 shadowPosition = lightViewProjection * shrinkedPos;
+	float d1 = (texture(shadowMapTex, (shadowPosition.xy / shadowPosition.w) * 0.5 + 0.5).r);	// 'd1' has a range of 0..1
+	float d2 = shadowPosition.z / shadowPosition.w * 0.5 + 0.5;																			// 'd2' has a range of 0..'lightFarPlane'
+	//d1 = depthLinear(d1);																					// So we scale 'd1' accordingly:
+	//d2 = depthLinear(d2);
+	float d = scale * abs(d1 - d2);
+
+	if (d < 0.5) 
+	{
+		d = max(0.5, d);
+	}
+
+	float dd = -d * d;
+
+	vec3 profile =  vec3(0.233, 0.455, 0.649) * exp(dd / 0.0064) +
+					vec3(0.1,   0.336, 0.344) * exp(dd / 0.0484) +
+					vec3(0.118, 0.198, 0.0)   * exp(dd / 0.187) +
+					vec3(0.113, 0.007, 0.007) * exp(dd / 0.567) +
+					vec3(0.358, 0.004, 0.0)   * exp(dd / 1.99) +
+					vec3(0.078, 0.0,   0.0)   * exp(dd / 7.41);
+
+    return profile * clamp(0.0 + dot(light, -worldNormal), 0.0, 1.0);
+	//return vec3(d2, d2, d2);
+}
+
 void main()
 {
     // 从G-Buffer中获得所有相关信息
@@ -201,7 +245,6 @@ void main()
 		//法线向量
         vec3 N = normalize(normal);
 		//反射向量
-        //vec3 R = refract(-V, N, 0.75f);
 	    vec3 R = reflect(-V, N);
 		
         float NdotV = max(dot(N, V), 0.0001f);
@@ -322,8 +365,11 @@ void main()
 
             color += ambientIBL * 0.7;
         }
+
+		color.rgb += kD * transmittance(0.7, 0.03, WorldPos.xyz, WorldNormal, -lightDirectionalArray[0].direction, ShadowMap, LightSpaceMatrix, LightSpaceFar) * lightDirectionalArray[0].color.rgb * 100; 
+
 		//不要忘记乘上光遮蔽贴图
-        color *= ao;
+        //color *= ao;
     }
 
     // 选择想要查看的缓存

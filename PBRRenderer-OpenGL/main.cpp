@@ -31,9 +31,10 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-
+#pragma region Vars
 GLuint WIDTH = 1980, HEIGHT = 1080;
 GLuint SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
+GLfloat LightNear = 0.1f, LightFar = 25.0f;
 
 glm::mat4 lightSpaceMatrix;
 
@@ -156,6 +157,7 @@ Light lightDirectional1;
 Shape quadRender;
 Shape envCubeRender;
 Shape PlaneRender;
+#pragma endregion
 
 #pragma region GLFWCallBack
 static void error_callback(int error, const char* description)
@@ -833,8 +835,7 @@ void RenderDepthMap(bool IsFront,glm::mat4 const &model)
 
 	//得到光源视角空间变换矩阵
 	glm::mat4 lightProjection, lightView;
-	GLfloat near_plane = 0.1f, far_plane = 25.0f;
-	lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
+	lightProjection = glm::ortho(-50.0f, 50.0f, -50.0f, 50.0f, LightNear, LightFar);
 	lightView = glm::lookAt(lightDirectionalDirection1 * -3.0f, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
 	lightSpaceMatrix = lightProjection * lightView;
 
@@ -863,6 +864,8 @@ void GBuffer(glm::mat4 const &model, glm::mat4 const &view, glm::mat4 const &pro
 
 	gBufferShader.useShader();
 
+	glUniform1f(glGetUniformLocation(gBufferShader.Program, "LightSpaceNear"), LightNear);
+	glUniform1f(glGetUniformLocation(gBufferShader.Program, "LightSpaceFar"), LightFar);
 	glUniformMatrix4fv(glGetUniformLocation(gBufferShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 	glUniformMatrix4fv(glGetUniformLocation(gBufferShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
 
@@ -871,6 +874,7 @@ void GBuffer(glm::mat4 const &model, glm::mat4 const &view, glm::mat4 const &pro
 	glUniformMatrix4fv(glGetUniformLocation(gBufferShader.Program, "projViewModel"), 1, GL_FALSE, glm::value_ptr(projViewModel));
 	glUniformMatrix4fv(glGetUniformLocation(gBufferShader.Program, "prevProjViewModel"), 1, GL_FALSE, glm::value_ptr(prevProjViewModel));
 	glUniformMatrix4fv(glGetUniformLocation(gBufferShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
+
 
 	//绘制物体
 	glActiveTexture(GL_TEXTURE0);
@@ -1022,7 +1026,7 @@ void LightingBRDF(glm::mat4 const &model, glm::mat4 const &view, glm::mat4 const
 	//求得投影矩阵的逆矩阵
 	glUniformMatrix4fv(glGetUniformLocation(lightingBRDFShader.Program, "inverseProj"), 1, GL_FALSE, glm::value_ptr(glm::inverse(projection)));
 	glUniformMatrix4fv(glGetUniformLocation(lightingBRDFShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
-	glUniformMatrix4fv(glGetUniformLocation(lightingBRDFShader.Program, "lightSpaceMatrix"), 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
+	glUniformMatrix4fv(glGetUniformLocation(lightingBRDFShader.Program, "LightSpaceMatrix"), 1, GL_FALSE, glm::value_ptr(lightSpaceMatrix));
 	glUniform3f(glGetUniformLocation(lightingBRDFShader.Program, "materialF0"), materialF0.r, materialF0.g, materialF0.b);
 	glUniform1i(glGetUniformLocation(lightingBRDFShader.Program, "gBufferView"), gBufferView);
 	glUniform1i(glGetUniformLocation(lightingBRDFShader.Program, "pointMode"), pointMode);
@@ -1329,47 +1333,49 @@ int main()
 		glQueryCounter(queryIDGUI[1], GL_TIMESTAMP);
 
 		//计算GPU消耗
-		GLint stopDepthTimerAvailable = 0;
-		GLint stopGeometryTimerAvailable = 0;
-		GLint stopLightingTimerAvailable = 0;
-		GLint stopSAOTimerAvailable = 0;
-		GLint stopPostprocessTimerAvailable = 0;
-		GLint stopForwardTimerAvailable = 0;
-		GLint stopGUITimerAvailable = 0;
-
-		while (!stopGeometryTimerAvailable && !stopLightingTimerAvailable && !stopSAOTimerAvailable && !stopPostprocessTimerAvailable && !stopForwardTimerAvailable && !stopGUITimerAvailable && !stopDepthTimerAvailable)
 		{
-			glGetQueryObjectiv(queryIDDepth[1], GL_QUERY_RESULT_AVAILABLE, &stopDepthTimerAvailable);
-			glGetQueryObjectiv(queryIDGeometry[1], GL_QUERY_RESULT_AVAILABLE, &stopGeometryTimerAvailable);
-			glGetQueryObjectiv(queryIDLighting[1], GL_QUERY_RESULT_AVAILABLE, &stopLightingTimerAvailable);
-			glGetQueryObjectiv(queryIDSAO[1], GL_QUERY_RESULT_AVAILABLE, &stopSAOTimerAvailable);
-			glGetQueryObjectiv(queryIDPostprocess[1], GL_QUERY_RESULT_AVAILABLE, &stopPostprocessTimerAvailable);
-			glGetQueryObjectiv(queryIDForward[1], GL_QUERY_RESULT_AVAILABLE, &stopForwardTimerAvailable);
-			glGetQueryObjectiv(queryIDGUI[1], GL_QUERY_RESULT_AVAILABLE, &stopGUITimerAvailable);
+			GLint stopDepthTimerAvailable = 0;
+			GLint stopGeometryTimerAvailable = 0;
+			GLint stopLightingTimerAvailable = 0;
+			GLint stopSAOTimerAvailable = 0;
+			GLint stopPostprocessTimerAvailable = 0;
+			GLint stopForwardTimerAvailable = 0;
+			GLint stopGUITimerAvailable = 0;
+
+			while (!stopGeometryTimerAvailable && !stopLightingTimerAvailable && !stopSAOTimerAvailable && !stopPostprocessTimerAvailable && !stopForwardTimerAvailable && !stopGUITimerAvailable && !stopDepthTimerAvailable)
+			{
+				glGetQueryObjectiv(queryIDDepth[1], GL_QUERY_RESULT_AVAILABLE, &stopDepthTimerAvailable);
+				glGetQueryObjectiv(queryIDGeometry[1], GL_QUERY_RESULT_AVAILABLE, &stopGeometryTimerAvailable);
+				glGetQueryObjectiv(queryIDLighting[1], GL_QUERY_RESULT_AVAILABLE, &stopLightingTimerAvailable);
+				glGetQueryObjectiv(queryIDSAO[1], GL_QUERY_RESULT_AVAILABLE, &stopSAOTimerAvailable);
+				glGetQueryObjectiv(queryIDPostprocess[1], GL_QUERY_RESULT_AVAILABLE, &stopPostprocessTimerAvailable);
+				glGetQueryObjectiv(queryIDForward[1], GL_QUERY_RESULT_AVAILABLE, &stopForwardTimerAvailable);
+				glGetQueryObjectiv(queryIDGUI[1], GL_QUERY_RESULT_AVAILABLE, &stopGUITimerAvailable);
+			}
+
+			glGetQueryObjectui64v(queryIDDepth[0], GL_QUERY_RESULT, &startDepthTime);
+			glGetQueryObjectui64v(queryIDDepth[1], GL_QUERY_RESULT, &stopDepthTime);
+			glGetQueryObjectui64v(queryIDGeometry[0], GL_QUERY_RESULT, &startGeometryTime);
+			glGetQueryObjectui64v(queryIDGeometry[1], GL_QUERY_RESULT, &stopGeometryTime);
+			glGetQueryObjectui64v(queryIDLighting[0], GL_QUERY_RESULT, &startLightingTime);
+			glGetQueryObjectui64v(queryIDLighting[1], GL_QUERY_RESULT, &stopLightingTime);
+			glGetQueryObjectui64v(queryIDSAO[0], GL_QUERY_RESULT, &startSAOTime);
+			glGetQueryObjectui64v(queryIDSAO[1], GL_QUERY_RESULT, &stopSAOTime);
+			glGetQueryObjectui64v(queryIDPostprocess[0], GL_QUERY_RESULT, &startPostprocessTime);
+			glGetQueryObjectui64v(queryIDPostprocess[1], GL_QUERY_RESULT, &stopPostprocessTime);
+			glGetQueryObjectui64v(queryIDForward[0], GL_QUERY_RESULT, &startForwardTime);
+			glGetQueryObjectui64v(queryIDForward[1], GL_QUERY_RESULT, &stopForwardTime);
+			glGetQueryObjectui64v(queryIDGUI[0], GL_QUERY_RESULT, &startGUITime);
+			glGetQueryObjectui64v(queryIDGUI[1], GL_QUERY_RESULT, &stopGUITime);
+
+			deltaDepthTime = (stopDepthTime - startDepthTime) / 1000000.0;
+			deltaGeometryTime = (stopGeometryTime - startGeometryTime) / 1000000.0;
+			deltaLightingTime = (stopLightingTime - startLightingTime) / 1000000.0;
+			deltaSAOTime = (stopSAOTime - startSAOTime) / 1000000.0;
+			deltaPostprocessTime = (stopPostprocessTime - startPostprocessTime) / 1000000.0;
+			deltaForwardTime = (stopForwardTime - startForwardTime) / 1000000.0;
+			deltaGUITime = (stopGUITime - startGUITime) / 1000000.0;
 		}
-
-		glGetQueryObjectui64v(queryIDDepth[0], GL_QUERY_RESULT, &startDepthTime);
-		glGetQueryObjectui64v(queryIDDepth[1], GL_QUERY_RESULT, &stopDepthTime);
-		glGetQueryObjectui64v(queryIDGeometry[0], GL_QUERY_RESULT, &startGeometryTime);
-		glGetQueryObjectui64v(queryIDGeometry[1], GL_QUERY_RESULT, &stopGeometryTime);
-		glGetQueryObjectui64v(queryIDLighting[0], GL_QUERY_RESULT, &startLightingTime);
-		glGetQueryObjectui64v(queryIDLighting[1], GL_QUERY_RESULT, &stopLightingTime);
-		glGetQueryObjectui64v(queryIDSAO[0], GL_QUERY_RESULT, &startSAOTime);
-		glGetQueryObjectui64v(queryIDSAO[1], GL_QUERY_RESULT, &stopSAOTime);
-		glGetQueryObjectui64v(queryIDPostprocess[0], GL_QUERY_RESULT, &startPostprocessTime);
-		glGetQueryObjectui64v(queryIDPostprocess[1], GL_QUERY_RESULT, &stopPostprocessTime);
-		glGetQueryObjectui64v(queryIDForward[0], GL_QUERY_RESULT, &startForwardTime);
-		glGetQueryObjectui64v(queryIDForward[1], GL_QUERY_RESULT, &stopForwardTime);
-		glGetQueryObjectui64v(queryIDGUI[0], GL_QUERY_RESULT, &startGUITime);
-		glGetQueryObjectui64v(queryIDGUI[1], GL_QUERY_RESULT, &stopGUITime);
-
-		deltaDepthTime = (stopDepthTime - startDepthTime) / 1000000.0;
-		deltaGeometryTime = (stopGeometryTime - startGeometryTime) / 1000000.0;
-		deltaLightingTime = (stopLightingTime - startLightingTime) / 1000000.0;
-		deltaSAOTime = (stopSAOTime - startSAOTime) / 1000000.0;
-		deltaPostprocessTime = (stopPostprocessTime - startPostprocessTime) / 1000000.0;
-		deltaForwardTime = (stopForwardTime - startForwardTime) / 1000000.0;
-		deltaGUITime = (stopGUITime - startGUITime) / 1000000.0;
 
 		glfwSwapBuffers(window);
 	}
