@@ -33,7 +33,7 @@
 
 #pragma region Vars
 GLuint WIDTH = 1980, HEIGHT = 1080;
-GLuint SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
+GLuint SHADOW_WIDTH = 2048, SHADOW_HEIGHT = 2048;
 GLfloat LightNear = 0.1f, LightFar = 25.0f;
 
 glm::mat4 lightSpaceMatrix;

@@ -145,7 +145,7 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 Normal, vec3 lightPos, vec3
     // 检查当前片元是否在阴影中
     float shadow = currentDepth - bias > closestDepth  ? 1.0 : 0.0;
     
-	// 使用PCF
+	// 进行模糊处理
     shadow = 0.0;
     vec2 texelSize = 1.0 / textureSize(ShadowMap, 0);
     for(int x = -1; x <= 1; ++x)
@@ -165,28 +165,20 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 Normal, vec3 lightPos, vec3
     return shadow;
 }
 
-vec3 transmittance(	float translucency,			// control the transmittance effect. Range: [0..1]
-					float width,				// Width of the filter
-					vec3 worldPosition,			// Position in world space
-					vec3 worldNormal,			// Normal in world space
-					vec3 light,					// Light vector: lightWorldPosition - worldPosition
-					sampler2D shadowMapTex,		// Linear 0..1 shadow map
-					mat4 lightViewProjection,	// Regular world to light space matrix
-					float lightFarPlane			// Far plane distance used in the light projection matrix
-					) 
+vec3 transmittance(float translucency, float width, vec3 worldPosition, vec3 worldNormal) 
 {
-	// Calculate the scale of the effect:
 	float scale = 8.25 * (1.0 - translucency) / width;
 
-	// Shrink the position inwards the surface to avoid artifacts:
-	vec4 shrinkedPos = vec4(worldPosition - 0.005 * worldNormal, 1.0);
+	// 向内收缩位置来减轻锯齿状
+	vec4 shrinkedPos = vec4(worldPosition - 0.05 * worldNormal, 1.0);
+	vec4 shadowPosition = LightSpaceMatrix * shrinkedPos;
 
-	// Calculate the thickness from the light point of view:
-	vec4 shadowPosition = lightViewProjection * shrinkedPos;
-	float d1 = (texture(shadowMapTex, (shadowPosition.xy / shadowPosition.w) * 0.5 + 0.5).r);	// 'd1' has a range of 0..1
-	float d2 = shadowPosition.z / shadowPosition.w * 0.5 + 0.5;																			// 'd2' has a range of 0..'lightFarPlane'
-	//d1 = depthLinear(d1);																					// So we scale 'd1' accordingly:
-	//d2 = depthLinear(d2);
+	vec3 projCoord = shadowPosition.xyz / shadowPosition.w;
+	projCoord = projCoord * 0.5 + 0.5;
+
+	float d1 = texture(ShadowMap, projCoord.xy).r;	
+	float d2 = projCoord.z;		
+	
 	float d = scale * abs(d1 - d2);
 
 	if (d < 0.5) 
@@ -203,8 +195,7 @@ vec3 transmittance(	float translucency,			// control the transmittance effect. R
 					vec3(0.358, 0.004, 0.0)   * exp(dd / 1.99) +
 					vec3(0.078, 0.0,   0.0)   * exp(dd / 7.41);
 
-    return profile * clamp(0.0 + dot(light, -worldNormal), 0.0, 1.0);
-	//return vec3(d2, d2, d2);
+    return profile * clamp(0.0 + dot(-lightDirectionalArray[0].direction, -worldNormal), 0.0, 1.0);
 }
 
 void main()
@@ -366,7 +357,7 @@ void main()
             color += ambientIBL * 0.7;
         }
 
-		color.rgb += kD * transmittance(0.7, 0.03, WorldPos.xyz, WorldNormal, -lightDirectionalArray[0].direction, ShadowMap, LightSpaceMatrix, LightSpaceFar) * lightDirectionalArray[0].color.rgb * 100; 
+		color.rgb += kD * transmittance(0.7, 0.03, WorldPos.xyz, WorldNormal) * lightDirectionalArray[0].color.rgb * 100; 
 
 		//不要忘记乘上光遮蔽贴图
         //color *= ao;
