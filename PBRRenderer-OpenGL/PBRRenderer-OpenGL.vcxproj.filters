@@ -142,12 +142,6 @@
     <None Include="resources\shaders\lighting\lightingBRDF.vert">
       <Filter>资源文件</Filter>
     </None>
-    <None Include="resources\shaders\lighting\point.frag">
-      <Filter>资源文件</Filter>
-    </None>
-    <None Include="resources\shaders\lighting\point.vert">
-      <Filter>资源文件</Filter>
-    </None>
     <None Include="resources\shaders\lighting\prefilterIBL.frag">
       <Filter>资源文件</Filter>
     </None>

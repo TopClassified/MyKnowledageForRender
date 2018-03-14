@@ -165,8 +165,6 @@
     <None Include="resources\shaders\lighting\irradianceIBL.vert" />
     <None Include="resources\shaders\lighting\lightingBRDF.frag" />
     <None Include="resources\shaders\lighting\lightingBRDF.vert" />
-    <None Include="resources\shaders\lighting\point.frag" />
-    <None Include="resources\shaders\lighting\point.vert" />
     <None Include="resources\shaders\lighting\prefilterIBL.frag" />
     <None Include="resources\shaders\lighting\prefilterIBL.vert" />
     <None Include="resources\shaders\lighting\simple.frag" />
