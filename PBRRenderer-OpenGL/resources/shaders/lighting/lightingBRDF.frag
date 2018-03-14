@@ -346,7 +346,7 @@ void main()
                 // 镜面反射
                 specular = (F * D * G) / (4.0f * NdotL * NdotV + 0.0001f);
 
-                color += (diffuse * kD + specular) * lightColor * NdotL * (1.0f - shadow);
+                color += (diffuse * kD + specular) * lightColor * NdotL * (1.0f - shadow) + kD * transmittance(0.7, 0.03, WorldPos.xyz, WorldNormal);
             }
         }
 
@@ -373,8 +373,6 @@ void main()
 
             color += ambientIBL * 0.7;
         }
-
-		color.rgb += kD * transmittance(0.7, 0.03, WorldPos.xyz, WorldNormal) * 10; 
 
 		//不要忘记乘上光遮蔽贴图
         color *= ao;
