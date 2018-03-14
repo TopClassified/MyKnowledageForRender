@@ -186,7 +186,7 @@ float getZ(float z)
     return (2.0 * LightSpaceFar * LightSpaceNear) / (LightSpaceNear + LightSpaceFar - z * (LightSpaceFar - LightSpaceNear));
 }
 
-vec3 transmittance(float Translucency, float width, vec3 worldPosition, vec3 worldNormal) 
+vec3 transmittance(float Translucency, float width, vec3 worldPosition, vec3 worldNormal, vec3 viewNormal, vec3 TheLightDir) 
 {
 	float scale = 8.25 * (1.0 - Translucency) / width;
 
@@ -210,21 +210,17 @@ vec3 transmittance(float Translucency, float width, vec3 worldPosition, vec3 wor
 
 	float dd = -d * d;
 
-	vec3 profile =  vec3(0.233, 0.455, 0.649) * exp(dd / 0.0064) +
-					vec3(0.1,   0.336, 0.344) * exp(dd / 0.0484) +
-					vec3(0.118, 0.198, 0.0)   * exp(dd / 0.187) +
-					vec3(0.113, 0.007, 0.007) * exp(dd / 0.567) +
-					vec3(0.358, 0.004, 0.0)   * exp(dd / 1.99) +
-					vec3(0.078, 0.0,   0.0)   * exp(dd / 7.41);
+	vec3 profile = vec3(0.233, 0.455, 0.649) * exp(dd / 0.0064) + vec3(0.100, 0.336, 0.344) * exp(dd / 0.0484) +
+				   vec3(0.118, 0.198, 0.000) * exp(dd / 0.1870) + vec3(0.113, 0.007, 0.007) * exp(dd / 0.5670) +
+				   vec3(0.358, 0.004, 0.000) * exp(dd / 1.9900) + vec3(0.078, 0.000, 0.000) * exp(dd / 7.4100);
 
-    return profile * clamp(0.0 + dot(lightDirectionalArray[0].direction, -worldNormal), 0.0, 1.0);
+    return profile * clamp(0.0 + dot(TheLightDir, -viewNormal), 0.0, 1.0);
 }
 
 void main()
 {
     // 从G-Buffer中获得所有相关信息
     vec3 viewPos = texture(gPosition, TexCoords).rgb;
-	vec4 Shadow_ViewPos = texture(gPosition, TexCoords);
     vec3 albedo = colorLinear(texture(gAlbedo, TexCoords).rgb);
     vec3 normal = texture(gNormal, TexCoords).rgb;
     float roughness = texture(gAlbedo, TexCoords).a;
@@ -326,10 +322,10 @@ void main()
         {
             for (int i = 0; i < lightDirectionalCounter; i++)
             {
-				shadow = ShadowCalculation( LightSpaceMatrix * vec4(vec3(WorldPos), 1.0f), WorldNormal, lightDirectionalArray[i].direction * -30.0f, vec3(WorldPos) );                      
+				shadow = ShadowCalculation( LightSpaceMatrix * vec4(vec3(WorldPos), 1.0f), normal, lightDirectionalArray[i].direction * -30.0f, viewPos );                      
 				shadow = min(shadow, 0.9);
 
-                vec3 L = normalize(- lightDirectionalArray[i].direction);
+                vec3 L = normalize(-lightDirectionalArray[i].direction);
                 vec3 H = normalize(L + V);
 
                 vec3 lightColor = colorLinear(lightDirectionalArray[i].color.rgb);
@@ -355,7 +351,8 @@ void main()
 
 				if (subSurfaceScattering)
 				{
-					color += albedo * lightColor * transmittance(translucency, sssWidth, WorldPos.xyz, WorldNormal);
+					color += albedo * lightColor * transmittance(translucency, sssWidth, WorldPos.xyz, WorldNormal, normal, L);
+					//color = L;
 				}
             }
         }

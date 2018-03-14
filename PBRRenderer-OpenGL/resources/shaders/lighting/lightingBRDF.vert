@@ -12,8 +12,10 @@ uniform mat4 inverseProj;
 void main()
 {
     TexCoords = texCoords;
+
 	//从屏幕空间变换到相机空间
     vec4 unprojCoords = (inverseProj * vec4(position, vec2(1.0f)));
+
 	//从相机空间变换到世界空间从而获得所需的采样向量
     envMapCoords = (inverseView * unprojCoords).xyz;
 
