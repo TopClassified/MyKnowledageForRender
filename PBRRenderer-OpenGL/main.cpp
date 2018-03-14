@@ -861,7 +861,7 @@ void RenderDepthMap(bool IsFront,glm::mat4 const &model)
 	PlaneRender.drawShape();
 
 	glUniformMatrix4fv(glGetUniformLocation(depthShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
-	PlaneRender.drawShape();
+	objectModel.Draw();
 
 	glUseProgram(0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -902,7 +902,7 @@ void GBuffer(glm::mat4 const &model, glm::mat4 const &view, glm::mat4 const &pro
 	glActiveTexture(GL_TEXTURE4);
 	objectAO.useTexture();
 	glUniform1i(glGetUniformLocation(gBufferShader.Program, "texAO"), 4);
-	PlaneRender.drawShape();
+	objectModel.Draw();
 
 	//ªÊ÷∆µÿ∞Â
 	glActiveTexture(GL_TEXTURE0);

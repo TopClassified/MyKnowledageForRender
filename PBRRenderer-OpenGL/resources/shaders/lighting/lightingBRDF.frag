@@ -164,7 +164,7 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 Normal, vec3 lightPos, vec3
     return shadow;
 }
 
-float gaussianBlurVertical(vec2 projCoord)
+/*float gaussianBlurVertical(vec2 projCoord)
 {
 	float weightH[5] = {0.0545, 0.2442, 0.4026, 0.2442, 0.0545};
 	float weightV[5] = {0.0545, 0.2442, 0.4026, 0.2442, 0.0545};
@@ -178,7 +178,7 @@ float gaussianBlurVertical(vec2 projCoord)
 		}
 	}
 	return result;
-}
+}*/
 
 float getZ(float z)
 {    
