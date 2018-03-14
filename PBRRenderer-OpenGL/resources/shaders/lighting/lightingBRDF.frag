@@ -41,6 +41,11 @@ uniform sampler2D worldPos;
 uniform sampler2D worldNormal;
 uniform mat4 LightSpaceMatrix;
 
+//子表面散射
+uniform float sssWidth;
+uniform float translucency;
+uniform bool subSurfaceScattering;
+
 uniform int gBufferView;
 uniform bool pointMode;
 uniform bool directionalMode;
@@ -181,9 +186,9 @@ float getZ(float z)
     return (2.0 * LightSpaceFar * LightSpaceNear) / (LightSpaceNear + LightSpaceFar - z * (LightSpaceFar - LightSpaceNear));
 }
 
-vec3 transmittance(float translucency, float width, vec3 worldPosition, vec3 worldNormal) 
+vec3 transmittance(float Translucency, float width, vec3 worldPosition, vec3 worldNormal) 
 {
-	float scale = 8.25 * (1.0 - translucency) / width;
+	float scale = 8.25 * (1.0 - Translucency) / width;
 
 	// 向内收缩位置来减轻锯齿状
 	vec4 shrinkedPos = vec4(worldPosition - 0.05 * worldNormal, 1.0);
@@ -346,7 +351,12 @@ void main()
                 // 镜面反射
                 specular = (F * D * G) / (4.0f * NdotL * NdotV + 0.0001f);
 
-                color += (diffuse * kD + specular) * lightColor * NdotL * (1.0f - shadow) + kD * transmittance(0.7, 0.03, WorldPos.xyz, WorldNormal);
+                color += (diffuse * kD + specular) * lightColor * NdotL * (1.0f - shadow); 
+
+				if (subSurfaceScattering)
+				{
+					color += kD * transmittance(translucency, sssWidth, WorldPos.xyz, WorldNormal);
+				}
             }
         }
 

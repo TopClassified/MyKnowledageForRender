@@ -76,6 +76,8 @@ GLfloat cameraAperture = 16.0f;
 GLfloat cameraShutterSpeed = 0.5f;
 GLfloat cameraISO = 1000.0f;
 GLfloat modelRotationSpeed = 0.0f;
+GLfloat translucency = 0.7f;
+GLfloat sssWidth = 0.03f;
 
 bool cameraMode;
 bool pointMode = false;
@@ -88,6 +90,7 @@ bool screenMode = false;
 bool firstMouse = true;
 bool guiIsOpen = true;
 bool keys[1024];
+bool subSurfaceScattering = false;
 
 glm::vec3 materialF0 = glm::vec3(0.04f);  // UE4 dielectric
 glm::vec3 lightPointPosition1 = glm::vec3(1.5f, 0.75f, 1.0f);
@@ -420,16 +423,16 @@ void imGuiSetup()
 
 		if (ImGui::TreeNode("Lighting"))
 		{
-			if (ImGui::TreeNode("Mode"))
+			if (ImGui::TreeNode("Lighting Mode"))
 			{
-				ImGui::Checkbox("Point", &pointMode);
-				ImGui::Checkbox("Directional", &directionalMode);
-				ImGui::Checkbox("Image-Based Lighting", &iblMode);
+				ImGui::Checkbox("Use Point Lighting", &pointMode);
+				ImGui::Checkbox("Use Directional Lighting", &directionalMode);
+				ImGui::Checkbox("Use Image-Based Lighting", &iblMode);
 
 				ImGui::TreePop();
 			}
 
-			if (ImGui::TreeNode("Point"))
+			if (ImGui::TreeNode("Point Lighting"))
 			{
 				if (ImGui::TreeNode("Position"))
 				{
@@ -469,7 +472,7 @@ void imGuiSetup()
 				ImGui::TreePop();
 			}
 
-			if (ImGui::TreeNode("Directional"))
+			if (ImGui::TreeNode("Directional Lighting"))
 			{
 				if (ImGui::TreeNode("Direction"))
 				{
@@ -654,6 +657,15 @@ void imGuiSetup()
 
 				ImGui::TreePop();
 			}
+
+			ImGui::TreePop();
+		}
+
+		if (ImGui::TreeNode("SubSurface Scattering"))
+		{
+			ImGui::Checkbox("OpenScattering", &subSurfaceScattering);
+			ImGui::SliderFloat("Translucency", &translucency, 0.0f, 1.0f);
+			ImGui::SliderFloat("sssWidth", &sssWidth, 0.0f, 0.1f);
 
 			ImGui::TreePop();
 		}
@@ -1033,6 +1045,10 @@ void LightingBRDF(glm::mat4 const &model, glm::mat4 const &view, glm::mat4 const
 	glUniform1i(glGetUniformLocation(lightingBRDFShader.Program, "attenuationMode"), attenuationMode);
 	glUniform1f(glGetUniformLocation(lightingBRDFShader.Program, "LightSpaceNear"), LightNear);
 	glUniform1f(glGetUniformLocation(lightingBRDFShader.Program, "LightSpaceFar"), LightFar);
+
+	glUniform1i(glGetUniformLocation(lightingBRDFShader.Program, "subSurfaceScattering"), subSurfaceScattering);
+	glUniform1f(glGetUniformLocation(lightingBRDFShader.Program, "sssWidth"), sssWidth);
+	glUniform1f(glGetUniformLocation(lightingBRDFShader.Program, "translucency"), translucency);
 
 	quadRender.drawShape();
 
