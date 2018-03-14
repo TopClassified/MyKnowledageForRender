@@ -50,12 +50,6 @@ uniform vec3 materialF0;
 
 uniform mat4 view;
 
-float depthLinear(float depth)
-{
-	float z = depth * 2.0f - 1.0f;
-	return (2.0f * LightSpaceNear * LightSpaceFar) / (LightSpaceFar + LightSpaceNear - z * (LightSpaceFar - LightSpaceNear));
-}
-
 vec3 colorLinear(vec3 colorVector)
 {
     vec3 linearColor = pow(colorVector.rgb, vec3(2.2f));
@@ -181,6 +175,12 @@ float gaussianBlurVertical(vec2 projCoord)
 	return result;
 }
 
+float getZ(float z)
+{    
+	z = z * 2.0f - 1.0f;
+    return (2.0 * LightSpaceFar * LightSpaceNear) / (LightSpaceNear + LightSpaceFar - z * (LightSpaceFar - LightSpaceNear));
+}
+
 vec3 transmittance(float translucency, float width, vec3 worldPosition, vec3 worldNormal) 
 {
 	float scale = 8.25 * (1.0 - translucency) / width;
@@ -192,10 +192,11 @@ vec3 transmittance(float translucency, float width, vec3 worldPosition, vec3 wor
 	vec3 projCoord = shadowPosition.xyz / shadowPosition.w;
 	projCoord = projCoord * 0.5 + 0.5;
 
-	float d1 = gaussianBlurVertical(projCoord.xy);	
-	float d2 = projCoord.z;		
+	//float d1 = gaussianBlurVertical(projCoord.xy);
+	float d1 = getZ(texture(ShadowMap, projCoord.xy).r);
+	float d2 = getZ(projCoord.z);		
 	
-	float d = scale * abs(d1 - d2);
+	float d = scale * abs(d1 - d2) * 5;
 
 	if (d < 0.5) 
 	{
@@ -211,7 +212,7 @@ vec3 transmittance(float translucency, float width, vec3 worldPosition, vec3 wor
 					vec3(0.358, 0.004, 0.0)   * exp(dd / 1.99) +
 					vec3(0.078, 0.0,   0.0)   * exp(dd / 7.41);
 
-    return profile * clamp(0.0 + dot(-lightDirectionalArray[0].direction, -worldNormal), 0.0, 1.0);
+    return profile * clamp(0.0 + dot(lightDirectionalArray[0].direction, -worldNormal), 0.0, 1.0);
 }
 
 void main()
@@ -373,10 +374,10 @@ void main()
             color += ambientIBL * 0.7;
         }
 
-		color.rgb += kD * transmittance(0.7, 0.03, WorldPos.xyz, WorldNormal) * lightDirectionalArray[0].color.rgb * 100; 
+		color.rgb += kD * transmittance(0.7, 0.03, WorldPos.xyz, WorldNormal) * 10; 
 
 		//不要忘记乘上光遮蔽贴图
-        //color *= ao;
+        color *= ao;
     }
 
     // 选择想要查看的缓存

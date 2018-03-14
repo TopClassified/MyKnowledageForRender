@@ -33,8 +33,8 @@
 
 #pragma region Vars
 GLuint WIDTH = 1980, HEIGHT = 1080;
-GLuint SHADOW_WIDTH = 2048, SHADOW_HEIGHT = 2048;
-GLfloat LightNear = 0.1f, LightFar = 25.0f;
+const GLuint SHADOW_WIDTH = 2048, SHADOW_HEIGHT = 2048;
+const GLfloat LightNear = 0.1f, LightFar = 100.0f;
 
 glm::mat4 lightSpaceMatrix;
 
@@ -96,7 +96,7 @@ glm::vec3 lightPointPosition3 = glm::vec3(0.0f, 0.75f, -1.2f);
 glm::vec3 lightPointColor1 = glm::vec3(1.0f);
 glm::vec3 lightPointColor2 = glm::vec3(1.0f);
 glm::vec3 lightPointColor3 = glm::vec3(1.0f);
-glm::vec3 lightDirectionalDirection1 = glm::vec3(-0.2f, -1.0f, -0.3f);
+glm::vec3 lightDirectionalDirection1 = glm::vec3(-1.0f, -1.0f, -1.0f);
 glm::vec3 lightDirectionalColor1 = glm::vec3(1.0f);
 glm::vec3 modelPosition = glm::vec3(0.0f);
 glm::vec3 modelRotationAxis = glm::vec3(0.0f, 1.0f, 0.0f);
@@ -836,7 +836,7 @@ void RenderDepthMap(bool IsFront,glm::mat4 const &model)
 	//得到光源视角空间变换矩阵
 	glm::mat4 lightProjection, lightView;
 	lightProjection = glm::ortho(-50.0f, 50.0f, -50.0f, 50.0f, LightNear, LightFar);
-	lightView = glm::lookAt(lightDirectionalDirection1 * -3.0f, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
+	lightView = glm::lookAt(lightDirectionalDirection1 * -30.0f, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
 	lightSpaceMatrix = lightProjection * lightView;
 
 	//从光源视角渲染场景
@@ -864,8 +864,6 @@ void GBuffer(glm::mat4 const &model, glm::mat4 const &view, glm::mat4 const &pro
 
 	gBufferShader.useShader();
 
-	glUniform1f(glGetUniformLocation(gBufferShader.Program, "LightSpaceNear"), LightNear);
-	glUniform1f(glGetUniformLocation(gBufferShader.Program, "LightSpaceFar"), LightFar);
 	glUniformMatrix4fv(glGetUniformLocation(gBufferShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
 	glUniformMatrix4fv(glGetUniformLocation(gBufferShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(view));
 
@@ -999,7 +997,7 @@ void LightingBRDF(glm::mat4 const &model, glm::mat4 const &view, glm::mat4 const
 	glActiveTexture(GL_TEXTURE11);
 	glBindTexture(GL_TEXTURE_2D, gworldNormal);
 
-	lightPoint1.setLightPosition(lightPointPosition1);
+	lightPoint1.setLightPosition(lightDirectionalDirection1 * -30.0f);
 	lightPoint2.setLightPosition(lightPointPosition2);
 	lightPoint3.setLightPosition(lightPointPosition3);
 	lightPoint1.setLightColor(glm::vec4(lightPointColor1, 1.0f));
@@ -1033,6 +1031,8 @@ void LightingBRDF(glm::mat4 const &model, glm::mat4 const &view, glm::mat4 const
 	glUniform1i(glGetUniformLocation(lightingBRDFShader.Program, "directionalMode"), directionalMode);
 	glUniform1i(glGetUniformLocation(lightingBRDFShader.Program, "iblMode"), iblMode);
 	glUniform1i(glGetUniformLocation(lightingBRDFShader.Program, "attenuationMode"), attenuationMode);
+	glUniform1f(glGetUniformLocation(lightingBRDFShader.Program, "LightSpaceNear"), LightNear);
+	glUniform1f(glGetUniformLocation(lightingBRDFShader.Program, "LightSpaceFar"), LightFar);
 
 	quadRender.drawShape();
 
@@ -1285,6 +1285,8 @@ int main()
 		cameraMove();
 
 		imGuiSetup();
+
+		lightDirectionalDirection1 = glm::normalize(lightDirectionalDirection1);
 
 		// Camera setting
 		glm::mat4 projection = glm::perspective(camera.cameraFOV, (float)WIDTH / (float)HEIGHT, 0.1f, 1000.0f);
