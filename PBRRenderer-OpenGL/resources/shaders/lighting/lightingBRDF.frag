@@ -326,7 +326,7 @@ void main()
         {
             for (int i = 0; i < lightDirectionalCounter; i++)
             {
-				shadow = ShadowCalculation( LightSpaceMatrix * vec4(vec3(WorldPos), 1.0f), WorldNormal, lightDirectionalArray[i].direction * -3.0f, vec3(WorldPos) );                      
+				shadow = ShadowCalculation( LightSpaceMatrix * vec4(vec3(WorldPos), 1.0f), WorldNormal, lightDirectionalArray[i].direction * -30.0f, vec3(WorldPos) );                      
 				shadow = min(shadow, 0.9);
 
                 vec3 L = normalize(- lightDirectionalArray[i].direction);
@@ -355,7 +355,7 @@ void main()
 
 				if (subSurfaceScattering)
 				{
-					color += kD * transmittance(translucency, sssWidth, WorldPos.xyz, WorldNormal);
+					color += albedo * lightColor * transmittance(translucency, sssWidth, WorldPos.xyz, WorldNormal);
 				}
             }
         }

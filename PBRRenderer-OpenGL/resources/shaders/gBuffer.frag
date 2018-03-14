@@ -32,11 +32,14 @@ float LinearizeDepth(float depth)
     return (2.0f * nearPlane * farPlane) / (farPlane + nearPlane - z * (farPlane - nearPlane));
 }
 
-//根据模型传入的法线向量来计算得到对应的切线空间矩阵，然后将法线贴图中的法线向量变换到切线空间中
+//根据模型传入的法线向量来计算得到对应的切线空间矩阵，然后将法线贴图中的法线向量变换到相机空间中
 vec3 computeTexNormal(vec3 viewNormal, vec3 texNormal)
 {
-    vec3 dPosX  = dFdx(viewPos);
-    vec3 dPosY  = dFdy(viewPos);
+	//计算顶点坐标之间的X、Y分量的delta值
+    vec3 dPosX = dFdx(viewPos);
+    vec3 dPosY = dFdy(viewPos);
+
+	//计算纹理坐标的U、V分量的delta值
     vec2 dTexX = dFdx(TexCoords);
     vec2 dTexY = dFdy(TexCoords);
 
@@ -52,6 +55,7 @@ void main()
 {
 	//从法线贴图中获得法线向量
     vec3 texNormal = normalize(texture(texNormal, TexCoords).rgb * 2.0f - 1.0f);
+
 	//如果法线贴图使用的是D3D坐标系则Z轴分量需要取相反数
     texNormal.g = -texNormal.g; 
 
@@ -71,6 +75,7 @@ void main()
 	//将从法线贴图中获得的法线转换到切线空间当中
     gNormal.rgb = computeTexNormal(normal, texNormal);
     //gNormal.rgb = normalize(normal);
+
 	//将金属度放到gNormal的a分量中
     gNormal.a = vec3(texture(texMetalness, TexCoords)).r;
 

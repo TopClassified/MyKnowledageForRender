@@ -33,7 +33,7 @@ void main()
     mat3 normalMatrix = transpose(inverse(mat3(view * model)));
     normal = normalMatrix * Normal;
 
-	//变换到屏幕空间
+	//变换到裁剪空间
     fragPosition = projViewModel * vec4(position, 1.0f);
     fragPrevPosition = prevProjViewModel * vec4(position, 1.0f);
 
