@@ -43,6 +43,7 @@ GLuint frontDepthMapFBO, frontDepthMap, backDepthMapFBO, backDepthMap;
 GLuint gBuffer, zBuffer, gPosition, gNormal, gAlbedo, gEffects, gworldPos, gworldNormal;
 GLuint saoFBO, saoBlurFBO, saoBuffer, saoBlurBuffer;
 GLuint postprocessFBO, postprocessBuffer;
+GLuint sssBlurFBO, sssBuffer, colorBuffer;
 GLuint envToCubeFBO, irradianceFBO, prefilterFBO, brdfLUTFBO, envToCubeRBO, irradianceRBO, prefilterRBO, brdfLUTRBO;
 
 GLint gBufferView = 1;
@@ -52,6 +53,7 @@ GLint attenuationMode = 2;
 GLint saoSamples = 12;
 GLint saoTurns = 7;
 GLint saoBlurSize = 4;
+GLint sssBlurSize = 1;
 GLint motionBlurMaxSamples = 32;
 
 GLfloat lastX = WIDTH / 2;
@@ -131,6 +133,7 @@ Shader integrateIBLShader;
 Shader firstpassPPShader;
 Shader saoShader;
 Shader saoBlurShader;
+Shader sssBlurShader;
 
 Texture objectAlbedo;
 Texture objectNormal;
@@ -655,6 +658,28 @@ void imGuiSetup()
 					materialF0 = glm::vec3(0.04f);
 				}
 
+				if (ImGui::Button("Marble1"))
+				{
+					objectAlbedo.setTexture("resources/textures/pbr/marble1/streaked-marble-albedo.png", "streaked-marble-Albedo", true);
+					objectNormal.setTexture("resources/textures/pbr/marble1/streaked-marble-normal.png", "streaked-marble-Normal", true);
+					objectRoughness.setTexture("resources/textures/pbr/marble1/streaked-marble-roughness.png", "streaked-marble-Roughness", true);
+					objectMetalness.setTexture("resources/textures/pbr/marble1/streaked-marble-metalness.png", "streaked-marble-Metalness", true);
+					objectAO.setTexture("resources/textures/pbr/marble1/streaked-marble-ao.png", "streaked-marble-AO", true);
+
+					materialF0 = glm::vec3(0.04f);
+				}
+
+				if (ImGui::Button("Marble2"))
+				{
+					objectAlbedo.setTexture("resources/textures/pbr/marble2/marble-speckled-albedo.png", "marble-speckled-Albedo", true);
+					objectNormal.setTexture("resources/textures/pbr/marble2/marble-speckled-normal.png", "marble-speckled-Normal", true);
+					objectRoughness.setTexture("resources/textures/pbr/marble2/marble-speckled-roughness.png", "marble-speckled-Roughness", true);
+					objectMetalness.setTexture("resources/textures/pbr/marble2/marble-speckled-metalness.png", "marble-speckled-Metalness", true);
+					objectAO.setTexture("resources/textures/pbr/marble2/marble-speckled-ao.png", "marble-speckled-AO", true);
+
+					materialF0 = glm::vec3(0.04f);
+				}
+
 				ImGui::TreePop();
 			}
 
@@ -666,6 +691,7 @@ void imGuiSetup()
 			ImGui::Checkbox("OpenScattering", &subSurfaceScattering);
 			ImGui::SliderFloat("Translucency", &translucency, 0.0f, 1.0f);
 			ImGui::SliderFloat("sssWidth", &sssWidth, 0.0f, 0.1f);
+			ImGui::SliderInt("Blur Size", &sssBlurSize, 0, 8);
 
 			ImGui::TreePop();
 		}
@@ -817,6 +843,32 @@ void saoSetup()
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
+void sssBlurSetup()
+{
+	glGenFramebuffers(1, &sssBlurFBO);
+	glBindFramebuffer(GL_FRAMEBUFFER, sssBlurFBO);
+
+	glGenTextures(1, &sssBuffer);
+	glBindTexture(GL_TEXTURE_2D, sssBuffer);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, WIDTH, HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, sssBuffer, 0);
+
+	glGenTextures(1, &colorBuffer);
+	glBindTexture(GL_TEXTURE_2D, colorBuffer);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, WIDTH, HEIGHT, 0, GL_RGBA, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, colorBuffer, 0);
+
+	GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+	glDrawBuffers(2, attachments);
+
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		std::cout << "SSSBlur Framebuffer not complete !" << std::endl;
+}
+
 void postprocessSetup()
 {
 	// Post-processing Buffer
@@ -861,7 +913,8 @@ void RenderDepthMap(bool IsFront,glm::mat4 const &model)
 	PlaneRender.drawShape();
 
 	glUniformMatrix4fv(glGetUniformLocation(depthShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
-	objectModel.Draw();
+	PlaneRender.drawShape();
+	//objectModel.Draw();
 
 	glUseProgram(0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -902,7 +955,8 @@ void GBuffer(glm::mat4 const &model, glm::mat4 const &view, glm::mat4 const &pro
 	glActiveTexture(GL_TEXTURE4);
 	objectAO.useTexture();
 	glUniform1i(glGetUniformLocation(gBufferShader.Program, "texAO"), 4);
-	objectModel.Draw();
+	PlaneRender.drawShape();
+	//objectModel.Draw();
 
 	//绘制地板
 	glActiveTexture(GL_TEXTURE0);
@@ -979,7 +1033,8 @@ void SAO()
 
 void LightingBRDF(glm::mat4 const &model, glm::mat4 const &view, glm::mat4 const &projection)
 {
-	glBindFramebuffer(GL_FRAMEBUFFER, postprocessFBO);
+	//glBindFramebuffer(GL_FRAMEBUFFER, postprocessFBO);
+	glBindFramebuffer(GL_FRAMEBUFFER, sssBlurFBO);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	lightingBRDFShader.useShader();
@@ -1051,6 +1106,31 @@ void LightingBRDF(glm::mat4 const &model, glm::mat4 const &view, glm::mat4 const
 	glUniform1f(glGetUniformLocation(lightingBRDFShader.Program, "translucency"), translucency);
 
 	quadRender.drawShape();
+
+	glUseProgram(0);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void sssBlur()
+{
+	glBindFramebuffer(GL_FRAMEBUFFER, postprocessFBO);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	sssBlurShader.useShader();
+
+	glUniform1i(glGetUniformLocation(sssBlurShader.Program, "sssBlurSize"), sssBlurSize);
+	glUniform1i(glGetUniformLocation(sssBlurShader.Program, "OpenSSSBlur"), subSurfaceScattering);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, sssBuffer);
+	glUniform1i(glGetUniformLocation(sssBlurShader.Program, "sssInput"), 0);
+
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, colorBuffer);
+	glUniform1i(glGetUniformLocation(sssBlurShader.Program, "colorInput"), 1);
+
+	quadRender.drawShape();
+
 
 	glUseProgram(0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -1184,6 +1264,8 @@ int main()
 	saoShader.setShader("resources/shaders/postprocess/sao.vert", "resources/shaders/postprocess/sao.frag");
 	//环境光遮蔽模糊着色器
 	saoBlurShader.setShader("resources/shaders/postprocess/sao.vert", "resources/shaders/postprocess/saoBlur.frag");
+	//次表面散射模糊着色器
+	sssBlurShader.setShader("resources/shaders/postprocess/sao.vert", "resources/shaders/postprocess/sssBlur.frag");
 
 
 	//载入贴图
@@ -1264,6 +1346,8 @@ int main()
 
 	saoSetup();
 
+	sssBlurSetup();
+
 	postprocessSetup();
 
 	iblSetup();
@@ -1333,6 +1417,7 @@ int main()
 		// 光照渲染
 		glQueryCounter(queryIDLighting[0], GL_TIMESTAMP);
 		LightingBRDF(model, view, projection);
+		sssBlur();
 		glQueryCounter(queryIDLighting[1], GL_TIMESTAMP);
 
 		// 后期渲染

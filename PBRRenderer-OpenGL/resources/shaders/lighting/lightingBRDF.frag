@@ -2,7 +2,9 @@
 
 in vec2 TexCoords;
 in vec3 envMapCoords;
-out vec4 colorOutput;
+
+layout (location = 0) out vec4 sssOutput;
+layout (location = 1) out vec4 colorOutput;
 
 const float PI = 3.14159265359f;
 const float prefilterLODLevel = 4.0f;
@@ -164,22 +166,6 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 Normal, vec3 lightPos, vec3
     return shadow;
 }
 
-/*float gaussianBlurVertical(vec2 projCoord)
-{
-	float weightH[5] = {0.0545, 0.2442, 0.4026, 0.2442, 0.0545};
-	float weightV[5] = {0.0545, 0.2442, 0.4026, 0.2442, 0.0545};
-	float result = 0.0f;
-	vec2 texelSize = 1.0 / textureSize(ShadowMap, 0);
-	for (int i = -2; i <= 2; ++i)
-	{
-		for (int j = -2; j <= 2; ++j)
-		{
-			result += texture(ShadowMap, projCoord.xy + vec2(j, i) * texelSize * 0.1).r * weightH[i + 2] * weightV[j + 2];
-		}
-	}
-	return result;
-}*/
-
 float getZ(float z)
 {    
 	z = z * 2.0f - 1.0f;
@@ -197,7 +183,6 @@ vec3 transmittance(float Translucency, float width, vec3 worldPosition, vec3 wor
 	vec3 projCoord = shadowPosition.xyz / shadowPosition.w;
 	projCoord = projCoord * 0.5 + 0.5;
 
-	//float d1 = gaussianBlurVertical(projCoord.xy);
 	float d1 = getZ(texture(ShadowMap, projCoord.xy).r);
 	float d2 = getZ(projCoord.z);		
 	
@@ -208,13 +193,15 @@ vec3 transmittance(float Translucency, float width, vec3 worldPosition, vec3 wor
 		d = max(0.5, d);
 	}
 
+	/* 模拟人类皮肤的肤色
 	float dd = -d * d;
 
 	vec3 profile = vec3(0.233, 0.455, 0.649) * exp(dd / 0.0064) + vec3(0.100, 0.336, 0.344) * exp(dd / 0.0484) +
 				   vec3(0.118, 0.198, 0.000) * exp(dd / 0.1870) + vec3(0.113, 0.007, 0.007) * exp(dd / 0.5670) +
 				   vec3(0.358, 0.004, 0.000) * exp(dd / 1.9900) + vec3(0.078, 0.000, 0.000) * exp(dd / 7.4100);
+	*/
 
-    return profile * clamp(0.0 + dot(TheLightDir, -viewNormal), 0.0, 1.0);
+    return  saturate(1 / (d * d)) * clamp(dot(TheLightDir, -viewNormal), 0.0, 1.0);
 }
 
 void main()
@@ -241,7 +228,7 @@ void main()
     vec3 color = vec3(0.0f);
     vec3 diffuse = vec3(0.0f);
     vec3 specular = vec3(0.0f);
-
+	vec3 sssResult = vec3(0.0f);
 
     if(depth == 1.0f)
     {
@@ -351,8 +338,7 @@ void main()
 
 				if (subSurfaceScattering)
 				{
-					color += albedo * lightColor * transmittance(translucency, sssWidth, WorldPos.xyz, WorldNormal, normal, L);
-					//color = L;
+					sssResult += albedo * lightColor * transmittance(translucency, sssWidth, WorldPos.xyz, WorldNormal, normal, L);
 				}
             }
         }
@@ -381,35 +367,63 @@ void main()
             color += ambientIBL * 0.7;
         }
 
-		//不要忘记乘上光遮蔽贴图
+		//不要忘记乘上AO贴图
         color *= ao;
     }
+
 
     // 选择想要查看的缓存
     // 最终结果缓存
     if(gBufferView == 1)
-        colorOutput = vec4(color, 1.0f);
+    {
+		colorOutput = vec4(color, 1.0f);
+		sssOutput = vec4(sssResult, 1.0f);
+	}
     // 位置缓存
     else if (gBufferView == 2)
-        colorOutput = vec4(viewPos, 1.0f);
+    {
+		colorOutput = vec4(viewPos, 1.0f);
+		sssOutput = vec4(0.0f, 0.0f, 0.0f, 1.0f);
+	}
     // 相机空间法线缓存
     else if (gBufferView == 3)
-        colorOutput = vec4(normal, 1.0f);
+    {
+		colorOutput = vec4(normal, 1.0f);
+		sssOutput = vec4(0.0f, 0.0f, 0.0f, 1.0f);
+	}
     // 光遮蔽缓存
     else if (gBufferView == 4)
-        colorOutput = vec4(albedo, 1.0f);
+    {
+		colorOutput = vec4(albedo, 1.0f);
+		sssOutput = vec4(0.0f, 0.0f, 0.0f, 1.0f);
+	}
     // 粗糙度缓存
     else if (gBufferView == 5)
-        colorOutput = vec4(vec3(roughness), 1.0f);
+    {
+		colorOutput = vec4(vec3(roughness), 1.0f);
+		sssOutput = vec4(0.0f, 0.0f, 0.0f, 1.0f);
+	}
     // 金属度缓存
     else if (gBufferView == 6)
-        colorOutput = vec4(vec3(metalness), 1.0f);
+    {
+		colorOutput = vec4(vec3(metalness), 1.0f);
+		sssOutput = vec4(0.0f, 0.0f, 0.0f, 1.0f);
+	}
     // 深度缓存
     else if (gBufferView == 7)
-        colorOutput = vec4(vec3(depth/1000.0f), 1.0f);
+    {
+		colorOutput = vec4(vec3(depth/1000.0f), 1.0f);
+		sssOutput = vec4(0.0f, 0.0f, 0.0f, 1.0f);
+	}
     // 环境光遮蔽缓存
     else if (gBufferView == 8)
-        colorOutput = vec4(vec3(sao), 1.0f);
+    {
+		colorOutput = vec4(vec3(sao), 1.0f);
+		sssOutput = vec4(0.0f, 0.0f, 0.0f, 1.0f);
+	}
     else if (gBufferView == 9)
-        colorOutput = vec4(velocity, 0.0f, 1.0f);
+    {
+		colorOutput = vec4(velocity, 0.0f, 1.0f);
+		sssOutput = vec4(0.0f, 0.0f, 0.0f, 1.0f);
+	}
 }

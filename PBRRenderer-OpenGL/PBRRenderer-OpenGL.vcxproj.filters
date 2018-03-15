@@ -161,5 +161,8 @@
       <Filter>资源文件</Filter>
     </None>
     <None Include="packages.config" />
+    <None Include="resources\shaders\postprocess\sssBlur.frag">
+      <Filter>资源文件</Filter>
+    </None>
   </ItemGroup>
 </Project>
