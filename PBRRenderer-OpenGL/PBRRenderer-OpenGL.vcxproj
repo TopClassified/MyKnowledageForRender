@@ -155,8 +155,6 @@
     <None Include="resources\shaders\gBuffer.vert" />
     <None Include="resources\shaders\latlongToCube.frag" />
     <None Include="resources\shaders\latlongToCube.vert" />
-    <None Include="resources\shaders\lighting\directional.frag" />
-    <None Include="resources\shaders\lighting\directional.vert" />
     <None Include="resources\shaders\lighting\environment.frag" />
     <None Include="resources\shaders\lighting\environment.vert" />
     <None Include="resources\shaders\lighting\integrateIBL.frag" />

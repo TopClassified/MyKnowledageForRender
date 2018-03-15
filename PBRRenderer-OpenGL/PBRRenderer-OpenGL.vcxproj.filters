@@ -112,12 +112,6 @@
     <None Include="resources\shaders\postprocess\saoBlur.frag">
       <Filter>资源文件</Filter>
     </None>
-    <None Include="resources\shaders\lighting\directional.frag">
-      <Filter>资源文件</Filter>
-    </None>
-    <None Include="resources\shaders\lighting\directional.vert">
-      <Filter>资源文件</Filter>
-    </None>
     <None Include="resources\shaders\lighting\environment.frag">
       <Filter>资源文件</Filter>
     </None>
