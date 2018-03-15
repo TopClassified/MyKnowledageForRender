@@ -983,6 +983,7 @@ void GBuffer(glm::mat4 const &model, glm::mat4 const &view, glm::mat4 const &pro
 
 	//保存当前帧的MVP矩阵，用于计算像素速度以制作动态模糊效果
 	prevProjViewModel = projViewModel;
+
 	glUseProgram(0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
@@ -1033,7 +1034,6 @@ void SAO()
 
 void LightingBRDF(glm::mat4 const &model, glm::mat4 const &view, glm::mat4 const &projection)
 {
-	//glBindFramebuffer(GL_FRAMEBUFFER, postprocessFBO);
 	glBindFramebuffer(GL_FRAMEBUFFER, sssBlurFBO);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 

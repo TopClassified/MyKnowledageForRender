@@ -39,6 +39,6 @@ void main()
 	}
 	else
 	{
-		sssBlurOutput = vec4(texture(sssInput, TexCoords).rgb + texture(colorInput, TexCoords).rgb, 1.0f);
+		sssBlurOutput = vec4(texture(colorInput, TexCoords).rgb, 1.0f);
 	}
 }

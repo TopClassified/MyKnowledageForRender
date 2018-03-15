@@ -32,7 +32,7 @@ float LinearizeDepth(float depth)
     return (2.0f * nearPlane * farPlane) / (farPlane + nearPlane - z * (farPlane - nearPlane));
 }
 
-//根据模型传入的法线向量来计算得到对应的切线空间矩阵，然后将法线贴图中的法线向量变换到相机空间中
+//将法线贴图中的法线向量变换到相机空间中
 vec3 computeTexNormal(vec3 viewNormal, vec3 texNormal)
 {
 	//计算顶点坐标之间的X、Y分量的delta值
@@ -59,7 +59,7 @@ void main()
 	//如果法线贴图使用的是D3D坐标系则Z轴分量需要取相反数
     texNormal.g = -texNormal.g; 
 
-	//手动计算投影纹理映射，并将值从[-1,1]限定在[0,1]之间
+	//计算屏幕空间坐标(准确来讲应该称之为纹理空间坐标。。。。。屏幕空间应该指的是最后gl_FragCoord所代表的坐标)
     vec2 fragPosA = (fragPosition.xy / fragPosition.w) * 0.5f + 0.5f;
     vec2 fragPosB = (fragPrevPosition.xy / fragPrevPosition.w) * 0.5f + 0.5f;
 
