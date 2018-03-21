@@ -28,25 +28,32 @@ uniform vec2 screenTextureSize;
 vec3 computeFxaa()
 {
     vec2 screenTextureOffset = screenTextureSize;
+
+	//与RGB的三个分量对应相乘后得到亮度
     vec3 luma = vec3(0.299f, 0.587f, 0.114f);
 
+	//分别采样左上、右上、左下、右下以及自身的像素颜色。
     vec3 offsetNW = texture(screenTexture, TexCoords.xy + (vec2(-1.0f, -1.0f) * screenTextureOffset)).xyz;
     vec3 offsetNE = texture(screenTexture, TexCoords.xy + (vec2(1.0f, -1.0f) * screenTextureOffset)).xyz;
     vec3 offsetSW = texture(screenTexture, TexCoords.xy + (vec2(-1.0f, 1.0f) * screenTextureOffset)).xyz;
     vec3 offsetSE = texture(screenTexture, TexCoords.xy + (vec2(1.0f, 1.0f) * screenTextureOffset)).xyz;
     vec3 offsetM  = texture(screenTexture, TexCoords.xy).xyz;
 
+	//计算亮度
     float lumaNW = dot(luma, offsetNW);
     float lumaNE = dot(luma, offsetNE);
     float lumaSW = dot(luma, offsetSW);
     float lumaSE = dot(luma, offsetSE);
     float lumaM  = dot(luma, offsetNW);
 
+	//计算边缘线的方向
     vec2 dir = vec2(-((lumaNW + lumaNE) - (lumaSW + lumaSE)), ((lumaNW + lumaSW) - (lumaNE + lumaSE)));
 
+	//计算真正的方向
     float dirReduce = max((lumaNW + lumaNE + lumaSW + lumaSE) * (FXAA_REDUCE_MUL * 0.25f), FXAA_REDUCE_MIN);
     float dirCorrection = 1.0f / (min(abs(dir.x), abs(dir.y)) + dirReduce);
 
+	//计算最终的采样位移
     dir = min(vec2(FXAA_SPAN_MAX), max(vec2(-FXAA_SPAN_MAX), dir * dirCorrection)) * screenTextureOffset;
 
     vec3 resultA = 0.5f * (texture(screenTexture, TexCoords.xy + (dir * vec2(1.0f / 3.0f - 0.5f))).xyz + texture(screenTexture, TexCoords.xy + (dir * vec2(2.0f / 3.0f - 0.5f))).xyz);
