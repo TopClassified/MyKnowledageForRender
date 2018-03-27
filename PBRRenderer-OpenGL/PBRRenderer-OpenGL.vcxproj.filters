@@ -83,6 +83,9 @@
     <ClInclude Include="Material.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="resources\shaders\gBuffer.frag">
@@ -158,5 +161,19 @@
     <None Include="resources\shaders\postprocess\sssBlur.frag">
       <Filter>资源文件</Filter>
     </None>
+    <None Include="resources\models\chinadragon\chinadragon.mtl" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="PBRRenderer-OpenGL.rc">
+      <Filter>资源文件</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Object Include="resources\models\chinadragon\chinadragon.obj" />
+    <Object Include="resources\models\shaderball\shaderball.obj" />
+    <Object Include="resources\models\shaderball\shaderball2.obj" />
+    <Object Include="resources\models\teapot\teapot.obj" />
+    <Object Include="resources\models\sphere\sphere.obj" />
+    <Object Include="resources\models\floor\floor.obj" />
   </ItemGroup>
 </Project>

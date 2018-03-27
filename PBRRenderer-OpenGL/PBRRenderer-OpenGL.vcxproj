@@ -144,6 +144,7 @@
     <ClInclude Include="Material.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Model.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="Shader.h" />
     <ClInclude Include="Shape.h" />
     <ClInclude Include="Skybox.h" />
@@ -151,6 +152,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+    <None Include="resources\models\chinadragon\chinadragon.mtl" />
     <None Include="resources\shaders\gBuffer.frag" />
     <None Include="resources\shaders\gBuffer.vert" />
     <None Include="resources\shaders\latlongToCube.frag" />
@@ -175,6 +177,17 @@
     <None Include="resources\shaders\postprocess\sssBlur.frag" />
     <None Include="shadow_mapping_depth.frag" />
     <None Include="shadow_mapping_depth.vert" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="PBRRenderer-OpenGL.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Object Include="resources\models\chinadragon\chinadragon.obj" />
+    <Object Include="resources\models\floor\floor.obj" />
+    <Object Include="resources\models\shaderball\shaderball.obj" />
+    <Object Include="resources\models\shaderball\shaderball2.obj" />
+    <Object Include="resources\models\sphere\sphere.obj" />
+    <Object Include="resources\models\teapot\teapot.obj" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

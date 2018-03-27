@@ -599,25 +599,25 @@ void imGuiSetup()
 
 			if (ImGui::TreeNode("Model"))
 			{
-				if (ImGui::Button("Sphere"))
+				if (ImGui::Button("ChinaDragon"))
 				{
 					objectModel.~Model();
-					objectModel.loadModel("resources/models/sphere/sphere.obj");
-					modelScale = glm::vec3(0.6f);
+					objectModel.loadModel("resources/models/chinadragon/chinadragon.obj");
+					modelScale = glm::vec3(0.1f);
 				}
 
 				if (ImGui::Button("Teapot"))
 				{
 					objectModel.~Model();
 					objectModel.loadModel("resources/models/teapot/teapot.obj");
-					modelScale = glm::vec3(0.6f);
+					modelScale = glm::vec3(4.0f);
 				}
 
 				if (ImGui::Button("Shader ball"))
 				{
 					objectModel.~Model();
 					objectModel.loadModel("resources/models/shaderball/shaderball.obj");
-					modelScale = glm::vec3(0.1f);
+					modelScale = glm::vec3(1.0f);
 				}
 
 				ImGui::TreePop();
@@ -913,8 +913,8 @@ void RenderDepthMap(bool IsFront,glm::mat4 const &model)
 	PlaneRender.drawShape();
 
 	glUniformMatrix4fv(glGetUniformLocation(depthShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
-	PlaneRender.drawShape();
-	//objectModel.Draw();
+	//PlaneRender.drawShape();
+	objectModel.Draw();
 
 	glUseProgram(0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -955,8 +955,8 @@ void GBuffer(glm::mat4 const &model, glm::mat4 const &view, glm::mat4 const &pro
 	glActiveTexture(GL_TEXTURE4);
 	objectAO.useTexture();
 	glUniform1i(glGetUniformLocation(gBufferShader.Program, "texAO"), 4);
-	PlaneRender.drawShape();
-	//objectModel.Draw();
+	//PlaneRender.drawShape();
+	objectModel.Draw();
 
 	//ªÊ÷∆µÿ∞Â
 	glActiveTexture(GL_TEXTURE0);
