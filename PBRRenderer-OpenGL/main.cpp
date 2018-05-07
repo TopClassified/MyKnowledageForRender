@@ -105,7 +105,7 @@ glm::vec3 lightDirectionalDirection1 = glm::vec3(-1.0f, -1.0f, -1.0f);
 glm::vec3 lightDirectionalColor1 = glm::vec3(1.0f);
 glm::vec3 modelPosition = glm::vec3(0.0f);
 glm::vec3 modelRotationAxis = glm::vec3(0.0f, 1.0f, 0.0f);
-glm::vec3 modelScale = glm::vec3(1.0f);
+glm::vec3 modelScale = glm::vec3(0.1f);
 
 glm::mat4 projViewModel;
 glm::mat4 prevProjViewModel = projViewModel;
@@ -599,25 +599,25 @@ void imGuiSetup()
 
 			if (ImGui::TreeNode("Model"))
 			{
-				if (ImGui::Button("Sphere"))
+				if (ImGui::Button("chinesedragon"))
 				{
 					objectModel.~Model();
-					objectModel.loadModel("resources/models/sphere/sphere.obj");
-					modelScale = glm::vec3(0.6f);
+					objectModel.loadModel("resources/models/chinesedragon/chinesedragon.obj");
+					modelScale = glm::vec3(0.1f);
 				}
 
 				if (ImGui::Button("Teapot"))
 				{
 					objectModel.~Model();
 					objectModel.loadModel("resources/models/teapot/teapot.obj");
-					modelScale = glm::vec3(0.6f);
+					modelScale = glm::vec3(2.0f);
 				}
 
 				if (ImGui::Button("Shader ball"))
 				{
 					objectModel.~Model();
 					objectModel.loadModel("resources/models/shaderball/shaderball.obj");
-					modelScale = glm::vec3(0.1f);
+					modelScale = glm::vec3(1.0f);
 				}
 
 				ImGui::TreePop();
@@ -913,8 +913,8 @@ void RenderDepthMap(bool IsFront,glm::mat4 const &model)
 	PlaneRender.drawShape();
 
 	glUniformMatrix4fv(glGetUniformLocation(depthShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(model));
-	PlaneRender.drawShape();
-	//objectModel.Draw();
+	//PlaneRender.drawShape();
+	objectModel.Draw();
 
 	glUseProgram(0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -955,8 +955,8 @@ void GBuffer(glm::mat4 const &model, glm::mat4 const &view, glm::mat4 const &pro
 	glActiveTexture(GL_TEXTURE4);
 	objectAO.useTexture();
 	glUniform1i(glGetUniformLocation(gBufferShader.Program, "texAO"), 4);
-	PlaneRender.drawShape();
-	//objectModel.Draw();
+	//PlaneRender.drawShape();
+	objectModel.Draw();
 
 	//绘制地板
 	glActiveTexture(GL_TEXTURE0);
@@ -1289,7 +1289,7 @@ int main()
 	floorAO.setTexture("resources/textures/pbr/woodfloor/woodfloor_ao.png", "woodfloorAO", true);
 
 	//载入模型
-	objectModel.loadModel("resources/models/shaderball/shaderball.obj");
+	objectModel.loadModel("resources/models/chinesedragon/chinesedragon.obj");
 
 	//立方体贴图
 	envCubeRender.setShape("cube", glm::vec3(0.0f));

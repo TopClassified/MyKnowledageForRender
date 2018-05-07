@@ -201,7 +201,7 @@ vec3 transmittance(float Translucency, float width, vec3 worldPosition, vec3 wor
 				   vec3(0.358, 0.004, 0.000) * exp(dd / 1.9900) + vec3(0.078, 0.000, 0.000) * exp(dd / 7.4100);
 	*/
 
-    return  saturate(1 / (d * d)) * clamp(dot(TheLightDir, -viewNormal), 0.0, 1.0);
+    return  saturate(exp(-d * d)) * saturate(dot(TheLightDir, -viewNormal));
 }
 
 void main()
