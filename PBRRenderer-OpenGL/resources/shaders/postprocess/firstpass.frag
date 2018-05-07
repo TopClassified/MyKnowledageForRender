@@ -53,7 +53,7 @@ vec3 computeFxaa()
     float dirReduce = max((lumaNW + lumaNE + lumaSW + lumaSE) * (FXAA_REDUCE_MUL * 0.25f), FXAA_REDUCE_MIN);
     float dirCorrection = 1.0f / (min(abs(dir.x), abs(dir.y)) + dirReduce);
 
-	//计算最终的采样位移
+	//计算最终的采样位移，FXAA_SPAN_MAX限制位移量不能超过8个像素
     dir = min(vec2(FXAA_SPAN_MAX), max(vec2(-FXAA_SPAN_MAX), dir * dirCorrection)) * screenTextureOffset;
 
     vec3 resultA = 0.5f * (texture(screenTexture, TexCoords.xy + (dir * vec2(1.0f / 3.0f - 0.5f))).xyz + texture(screenTexture, TexCoords.xy + (dir * vec2(2.0f / 3.0f - 0.5f))).xyz);

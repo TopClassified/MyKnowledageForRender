@@ -46,7 +46,7 @@ vec3 computeImportanceSampleGGX(vec2 Xi, float roughness, vec3 N)
     H.y = sinTheta * sin(anglePhi);
     H.z = cosTheta;
 
-	//转换到切线空间
+	//从切线空间转换到世界空间
     vec3 upDir = abs(N.z) < 0.999f ? vec3(0.0f, 0.0f, 1.0f) : vec3(1.0f, 0.0f, 0.0f);
     vec3 tanX = normalize(cross(upDir, N));
     vec3 tanY = cross(N, tanX);

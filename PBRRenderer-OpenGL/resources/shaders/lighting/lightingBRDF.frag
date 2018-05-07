@@ -172,7 +172,7 @@ float getZ(float z)
     return (2.0 * LightSpaceFar * LightSpaceNear) / (LightSpaceNear + LightSpaceFar - z * (LightSpaceFar - LightSpaceNear));
 }
 
-vec3 transmittance(float Translucency, float width, vec3 worldPosition, vec3 worldNormal, vec3 viewNormal, vec3 TheLightDir) 
+float transmittance(float Translucency, float width, vec3 worldPosition, vec3 worldNormal, vec3 viewNormal, vec3 TheLightDir, vec3 View) 
 {
 	float scale = 8.25 * (1.0 - Translucency) / width;
 
@@ -186,7 +186,7 @@ vec3 transmittance(float Translucency, float width, vec3 worldPosition, vec3 wor
 	float d1 = getZ(texture(ShadowMap, projCoord.xy).r);
 	float d2 = getZ(projCoord.z);		
 	
-	float d = scale * abs(d1 - d2) * 5;
+	float d = scale * abs(d1 - d2);
 
 	if (d < 0.5) 
 	{
@@ -201,7 +201,8 @@ vec3 transmittance(float Translucency, float width, vec3 worldPosition, vec3 wor
 				   vec3(0.358, 0.004, 0.000) * exp(dd / 1.9900) + vec3(0.078, 0.000, 0.000) * exp(dd / 7.4100);
 	*/
 
-    return  saturate(exp(-d * d)) * saturate(dot(TheLightDir, -viewNormal));
+    return  saturate(exp(-d * d)) * clamp(0.3 + dot(TheLightDir, -viewNormal), 0.0, 1.0);
+	//return  saturate(exp(-d * d)) * saturate(dot( normalize(-TheLightDir + viewNormal), View)) * 5;
 }
 
 void main()
@@ -338,7 +339,7 @@ void main()
 
 				if (subSurfaceScattering)
 				{
-					sssResult += albedo * lightColor * transmittance(translucency, sssWidth, WorldPos.xyz, WorldNormal, normal, L);
+					sssResult += albedo * lightColor * transmittance(translucency, sssWidth, WorldPos.xyz, WorldNormal, normal, L, V);
 				}
             }
         }

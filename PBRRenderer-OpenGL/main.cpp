@@ -105,7 +105,7 @@ glm::vec3 lightDirectionalDirection1 = glm::vec3(-1.0f, -1.0f, -1.0f);
 glm::vec3 lightDirectionalColor1 = glm::vec3(1.0f);
 glm::vec3 modelPosition = glm::vec3(0.0f);
 glm::vec3 modelRotationAxis = glm::vec3(0.0f, 1.0f, 0.0f);
-glm::vec3 modelScale = glm::vec3(0.1f);
+glm::vec3 modelScale = glm::vec3(1.0f);
 
 glm::mat4 projViewModel;
 glm::mat4 prevProjViewModel = projViewModel;
@@ -599,10 +599,10 @@ void imGuiSetup()
 
 			if (ImGui::TreeNode("Model"))
 			{
-				if (ImGui::Button("chinesedragon"))
+				if (ImGui::Button("ChinaDragon"))
 				{
 					objectModel.~Model();
-					objectModel.loadModel("resources/models/chinesedragon/chinesedragon.obj");
+					objectModel.loadModel("resources/models/chinadragon/chinadragon.obj");
 					modelScale = glm::vec3(0.1f);
 				}
 
@@ -610,7 +610,7 @@ void imGuiSetup()
 				{
 					objectModel.~Model();
 					objectModel.loadModel("resources/models/teapot/teapot.obj");
-					modelScale = glm::vec3(2.0f);
+					modelScale = glm::vec3(4.0f);
 				}
 
 				if (ImGui::Button("Shader ball"))
@@ -1289,7 +1289,7 @@ int main()
 	floorAO.setTexture("resources/textures/pbr/woodfloor/woodfloor_ao.png", "woodfloorAO", true);
 
 	//载入模型
-	objectModel.loadModel("resources/models/chinesedragon/chinesedragon.obj");
+	objectModel.loadModel("resources/models/shaderball/shaderball.obj");
 
 	//立方体贴图
 	envCubeRender.setShape("cube", glm::vec3(0.0f));
